@@ -265,6 +265,13 @@ void setup_speaker(bool playSound, bool _led_tick, bool _speaker_tick) {
   tick_enable(true);
 }
 
+void update_tick_settings(bool _led_tick, bool _speaker_tick) {
+  // Update tick settings after config change
+  led_tick_wanted = _led_tick;
+  speaker_tick_wanted = _speaker_tick;
+  tick_enable(true);  // apply the new settings
+}
+
 // Timer helpers
 
 #define RECHARGE_TIMER 0

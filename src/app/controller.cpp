@@ -244,3 +244,13 @@ void MultiGeigerController::loopOnce() {
   long loop_duration = millis() - current_ms;
   iotWebConf.delay((loop_duration < LOOP_DURATION) ? (LOOP_DURATION - loop_duration) : 0);
 }
+
+void MultiGeigerController::applyTickSettings(bool ledTick, bool speakerTick) {
+  // Apply tick settings respecting DIP switch state
+  io.updateTickSettings(ledTick && switches_state.led_on, speakerTick && switches_state.speaker_on);
+}
+
+void MultiGeigerController::applyDisplaySetting(bool showDisplay) {
+  // Apply display setting respecting DIP switch state
+  display.applyDisplaySetting(showDisplay && switches_state.display_on);
+}

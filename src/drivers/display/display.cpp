@@ -161,3 +161,19 @@ void DisplayModule::showGmc(unsigned int TimeSec, int RadNSvph, int CPM, bool us
   renderStatus();
   displayIsClear = false;
 }
+
+void DisplayModule::applyDisplaySetting(bool use_display) {
+  // Immediately apply display on/off setting
+  if (!use_display) {
+    // Turn off display
+    if (!displayIsClear) {
+      pu8x8->clear();
+      clearLine(4);
+      clearLine(5);
+      displayIsClear = true;
+    }
+  } else {
+    // Turn on display - reset clear flag so next showGmc will refresh
+    displayIsClear = false;
+  }
+}

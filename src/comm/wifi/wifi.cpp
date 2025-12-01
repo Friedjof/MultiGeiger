@@ -3,7 +3,10 @@
 // - via LoRa to TTN (to internet servers)
 
 #include "wifi.hpp"
+#include "app/controller.hpp"
 #include <string.h>
+
+extern MultiGeigerController controller;
 
 #ifndef MQTT_BASE_TOPIC
 #define MQTT_BASE_TOPIC ""
@@ -658,6 +661,9 @@ void configSaved(void) {
   log(INFO, "Config saved. ");
   loadConfigVariables();
   tick_enable(true);
+  // Apply updated settings immediately (LED, speaker, display)
+  controller.applyTickSettings(ledTick, speakerTick);
+  controller.applyDisplaySetting(showDisplay);
 }
 
 void setup_webconf(bool loraHardware) {

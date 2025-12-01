@@ -25,6 +25,7 @@ void setup_switches(bool isLoraBoard);
 Switches read_switches(void);
 
 void setup_speaker(bool playSound, bool led_tick, bool speaker_tick);
+void update_tick_settings(bool led_tick, bool speaker_tick);
 void tick_enable(bool enable);
 void tick(bool high);
 void alarm();
@@ -40,6 +41,7 @@ public:
   Switches readSwitches() { return read_switches(); }
 
   void setupSpeaker(bool playSound, bool ledTick, bool speakerTick) { setup_speaker(playSound, ledTick, speakerTick); }
+  void updateTickSettings(bool ledTick, bool speakerTick) { update_tick_settings(ledTick, speakerTick); }
   void enableTick(bool enable) { tick_enable(enable); }
   void doTick(bool high) { tick(high); }
   void triggerAlarm() { alarm(); }

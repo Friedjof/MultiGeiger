@@ -17,6 +17,8 @@ class MultiGeigerController {
 public:
   void begin();
   void loopOnce();
+  void applyTickSettings(bool ledTick, bool speakerTick);
+  void applyDisplaySetting(bool showDisplay);
 
 private:
   void setupNtp(int wifiStatus);

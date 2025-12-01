@@ -71,6 +71,7 @@ class DisplayModule {
 public:
   void begin(bool loraHardware);
   void showGmc(unsigned int timeSec, int radNSvph, int cpm, bool useDisplay);
+  void applyDisplaySetting(bool useDisplay);
   void clearLine(int line);
   void showStatusLine(const String &txt);
   void setStatus(int index, int value);

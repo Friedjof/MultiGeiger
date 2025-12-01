@@ -2,7 +2,7 @@
 
 #include "app/controller.hpp"
 
-static MultiGeigerController controller;
+MultiGeigerController controller;  // Global instance (used by config callbacks)
 
 void setup() {
   controller.begin();
