@@ -5,19 +5,28 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#if MQTT_USE_TLS
-#include <WiFiClientSecure.h>
-#else
 #include <WiFiClient.h>
-#endif
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 
 #include "core/core.hpp"
 #include "config/config.hpp"
 
+struct MqttConfig {
+  bool enabled;
+  String host;
+  uint16_t port;
+  bool useTls;
+  String username;
+  String password;
+  bool retain;
+  int qos;
+  String baseTopic;
+};
+
 class MqttPublisher {
 public:
-  void begin(const char *deviceName);
+  void begin(const MqttConfig &cfg, const char *deviceName);
   void loop();
   void publishMeasurement(const String &tubeType, int tubeNbr, unsigned int dt_ms, unsigned int hv_pulses,
                           unsigned int gm_counts, unsigned int cpm, bool have_thp, float temperature,
@@ -32,12 +41,14 @@ private:
   bool publishValue(const String &topicSuffix, const String &value);
   void publishTimestamp(const String &topicSuffix);
 
-#if MQTT_USE_TLS
-  WiFiClientSecure netClient;
-#else
-  WiFiClient netClient;
-#endif
-  PubSubClient client{netClient};
+  void configureClient();
+
+  MqttConfig config{};
+  String deviceBaseTopic;
+  WiFiClient plainClient;
+  WiFiClientSecure tlsClient;
+  Client *activeClient = nullptr;
+  PubSubClient client;
   String baseTopic;
   unsigned long lastReconnectAttempt = 0;
   bool initialized = false;

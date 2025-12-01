@@ -3,6 +3,13 @@
 // - via LoRa to TTN (to internet servers)
 
 #include "wifi.hpp"
+#include <string.h>
+
+#ifndef MQTT_BASE_TOPIC
+#define MQTT_BASE_TOPIC ""
+#endif
+
+extern IotWebConf iotWebConf;
 
 // CA Roots for LetsEncrypt Certificates (cross-signed):
 // - 1. ISRG Root X1 - valid until 2035-06-04
@@ -402,6 +409,21 @@ bool sendToMadavi = SEND2MADAVI;
 bool sendToLora = SEND2LORA;
 bool sendToBle = SEND2BLE;
 bool soundLocalAlarm = LOCAL_ALARM_SOUND;
+bool sendToMqtt = SEND2MQTT;
+
+#define MQTT_HOST_LEN 64
+#define MQTT_USER_LEN IOTWEBCONF_WORD_LEN
+#define MQTT_PASS_LEN IOTWEBCONF_WORD_LEN
+#define MQTT_BASE_TOPIC_LEN 64
+
+char mqttHost[MQTT_HOST_LEN] = MQTT_BROKER;
+uint16_t mqttPort = MQTT_PORT;
+bool mqttUseTls = MQTT_USE_TLS;
+bool mqttRetain = MQTT_RETAIN;
+int mqttQos = MQTT_QOS;
+char mqttUsername[MQTT_USER_LEN] = MQTT_USERNAME;
+char mqttPassword[MQTT_PASS_LEN] = MQTT_PASSWORD;
+char mqttBaseTopic[MQTT_BASE_TOPIC_LEN] = MQTT_BASE_TOPIC;
 
 char speakerTick_c[CHECKBOX_LEN];
 char playSound_c[CHECKBOX_LEN];
@@ -412,6 +434,9 @@ char sendToMadavi_c[CHECKBOX_LEN];
 char sendToLora_c[CHECKBOX_LEN];
 char sendToBle_c[CHECKBOX_LEN];
 char soundLocalAlarm_c[CHECKBOX_LEN];
+char sendToMqtt_c[CHECKBOX_LEN];
+char mqttUseTls_c[CHECKBOX_LEN];
+char mqttRetain_c[CHECKBOX_LEN];
 
 char appeui[17] = "";
 char deveui[17] = "";
@@ -437,6 +462,22 @@ iotwebconf::TextParameter deveuiParam = iotwebconf::TextParameter("DEVEUI", "dev
 iotwebconf::TextParameter appeuiParam = iotwebconf::TextParameter("APPEUI", "appeui", appeui, 17);
 iotwebconf::TextParameter appkeyParam = iotwebconf::TextParameter("APPKEY", "appkey", appkey, 33);
 
+iotwebconf::ParameterGroup grpMqtt = iotwebconf::ParameterGroup("mqtt", "MQTT Settings");
+iotwebconf::CheckboxParameter sendToMqttParam = iotwebconf::CheckboxParameter("Send to MQTT", "send2mqtt", sendToMqtt_c, CHECKBOX_LEN, sendToMqtt);
+iotwebconf::TextParameter mqttHostParam = iotwebconf::TextParameter("MQTT host", "mqttHost", mqttHost, MQTT_HOST_LEN);
+auto mqttPortParam =
+  iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("mqttPort")
+  .label("MQTT port")
+  .defaultValue(mqttPort)
+  .min(1).max(65535)
+  .placeholder("1883")
+  .build();
+iotwebconf::CheckboxParameter mqttUseTlsParam = iotwebconf::CheckboxParameter("Use TLS (insecure PoC)", "mqttTls", mqttUseTls_c, CHECKBOX_LEN, mqttUseTls);
+iotwebconf::CheckboxParameter mqttRetainParam = iotwebconf::CheckboxParameter("Retain MQTT messages", "mqttRetain", mqttRetain_c, CHECKBOX_LEN, mqttRetain);
+iotwebconf::TextParameter mqttUserParam = iotwebconf::TextParameter("MQTT username", "mqttUser", mqttUsername, MQTT_USER_LEN);
+iotwebconf::TextParameter mqttPassParam = iotwebconf::TextParameter("MQTT password", "mqttPass", mqttPassword, MQTT_PASS_LEN);
+iotwebconf::TextParameter mqttBaseTopicParam = iotwebconf::TextParameter("Base topic (optional)", "mqttBase", mqttBaseTopic, MQTT_BASE_TOPIC_LEN);
+
 iotwebconf::ParameterGroup grpAlarm = iotwebconf::ParameterGroup("alarm", "Local Alarm Setting");
 iotwebconf::CheckboxParameter soundLocalAlarmParam = iotwebconf::CheckboxParameter("Enable local alarm sound", "soundLocalAlarm", soundLocalAlarm_c, CHECKBOX_LEN, soundLocalAlarm);
 iotwebconf::FloatTParameter localAlarmThresholdParam =
@@ -450,12 +491,6 @@ iotwebconf::IntTParameter<int16_t> localAlarmFactorParam =
   defaultValue(localAlarmFactor).
   min(2).max(100).
   step(1).placeholder("2..100").build();
-
-// This only needs to be changed if the layout of the configuration is changed.
-// Appending new variables does not require a new version number here.
-// If this value is changed, ALL configuration variables must be re-entered,
-// including the WiFi credentials.
-#define CONFIG_VERSION "015"
 
 DNSServer dnsServer;
 WebServer server(80);
@@ -528,6 +563,41 @@ void handleRoot(void) {  // Handle web requests to "/" path.
 }
 
 static char lastWiFiSSID[IOTWEBCONF_WORD_LEN] = "";
+static WiFiEventId_t wifiEventId;
+static WiFiEventId_t apEventId;
+
+static bool hasConfiguredWifi() {
+  const char *cfgSsid = iotWebConf.getWifiSsidParameter()->valueBuffer;
+  return (cfgSsid != nullptr) && (strlen(cfgSsid) > 0);
+}
+
+static void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event != ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
+    return;
+
+  int reason = info.wifi_sta_disconnected.reason;
+  log(INFO, "WiFi disconnect event (reason=%d)", reason);
+
+  if (!hasConfiguredWifi()) {
+    log(INFO, "WiFi reconnect skipped: no client SSID configured");
+    return;
+  }
+
+  log(INFO, "WiFi reconnecting to configured network via IotWebConf");
+  // The regular doLoop will push us back to Connecting state.
+}
+
+static void onApClientEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event != ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)
+    return;
+  if (!hasConfiguredWifi())
+    return;
+  if (iotWebConf.getState() != iotwebconf::ApMode)
+    return;
+
+  log(INFO, "AP client disconnected, try STA reconnect");
+  iotWebConf.forceApMode(false);  // will change state to Connecting if allowed
+}
 
 void loadConfigVariables(void) {
   // check if WiFi SSID has changed. If so, restart cpu. Otherwise, the program will not use the new SSID
@@ -548,6 +618,18 @@ void loadConfigVariables(void) {
   soundLocalAlarm = soundLocalAlarmParam.isChecked();
   localAlarmThreshold = localAlarmThresholdParam.value();
   localAlarmFactor = localAlarmFactorParam.value();
+  sendToMqtt = sendToMqttParam.isChecked();
+  mqttUseTls = mqttUseTlsParam.isChecked();
+  mqttRetain = mqttRetainParam.isChecked();
+  mqttPort = mqttPortParam.value();
+  strncpy(mqttHost, mqttHostParam.valueBuffer, MQTT_HOST_LEN);
+  mqttHost[MQTT_HOST_LEN - 1] = '\0';
+  strncpy(mqttUsername, mqttUserParam.valueBuffer, MQTT_USER_LEN);
+  mqttUsername[MQTT_USER_LEN - 1] = '\0';
+  strncpy(mqttPassword, mqttPassParam.valueBuffer, MQTT_PASS_LEN);
+  mqttPassword[MQTT_PASS_LEN - 1] = '\0';
+  strncpy(mqttBaseTopic, mqttBaseTopicParam.valueBuffer, MQTT_BASE_TOPIC_LEN);
+  mqttBaseTopic[MQTT_BASE_TOPIC_LEN - 1] = '\0';
 }
 
 void configSaved(void) {
@@ -580,6 +662,15 @@ void setup_webconf(bool loraHardware) {
   grpTransmission.addItem(&sendToMadaviParam);
   grpTransmission.addItem(&sendToBleParam);
   iotWebConf.addParameterGroup(&grpTransmission);
+  grpMqtt.addItem(&sendToMqttParam);
+  grpMqtt.addItem(&mqttHostParam);
+  grpMqtt.addItem(&mqttPortParam);
+  grpMqtt.addItem(&mqttUseTlsParam);
+  grpMqtt.addItem(&mqttRetainParam);
+  grpMqtt.addItem(&mqttUserParam);
+  grpMqtt.addItem(&mqttPassParam);
+  grpMqtt.addItem(&mqttBaseTopicParam);
+  iotWebConf.addParameterGroup(&grpMqtt);
   if (isLoraBoard) {
     grpLoRa.addItem(&sendToLoraParam);
     grpLoRa.addItem(&deveuiParam);
@@ -597,8 +688,26 @@ void setup_webconf(bool loraHardware) {
     sendToLora = false;
 
   iotWebConf.init();
-
   loadConfigVariables();
+
+  // Ensure AP password is set; otherwise library forces permanent AP mode.
+  if (iotWebConf.getApPasswordParameter()->valueBuffer[0] == '\0') {
+    strncpy(iotWebConf.getApPasswordParameter()->valueBuffer, wifiInitialApPassword, IOTWEBCONF_PASSWORD_LEN);
+    iotWebConf.getApPasswordParameter()->valueBuffer[IOTWEBCONF_PASSWORD_LEN - 1] = '\0';
+    iotWebConf.saveConfig();
+  }
+
+  if (hasConfiguredWifi()) {
+    iotWebConf.skipApStartup();               // prefer STA first
+    iotWebConf.setWifiConnectionTimeoutMs(15000);  // STA connect timeout -> fall back to AP
+    iotWebConf.setApTimeoutMs(15000);              // if we end up in AP, retry STA after timeout
+    iotWebConf.forceApMode(false);                 // ensure we are allowed to leave AP
+  }
+
+  wifiEventId = WiFi.onEvent(onWifiEvent);
+  apEventId = WiFi.onEvent(onApClientEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+  (void)wifiEventId;  // suppress unused warning for now
+  (void)apEventId;
 
   auto sendNoContent = []() {
     server.send(204, "text/plain", "");

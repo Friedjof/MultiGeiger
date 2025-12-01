@@ -5,30 +5,31 @@
 static const unsigned long RECONNECT_INTERVAL_MS = 5000;
 static const size_t MQTT_BUFFER_SIZE = 512;
 
-void MqttPublisher::begin(const char *deviceName) {
-  if (!SEND2MQTT) {
-    log(DEBUG, "MQTT: disabled (SEND2MQTT=false)");
+void MqttPublisher::begin(const MqttConfig &cfg, const char *deviceName) {
+  config = cfg;
+  if (!config.enabled) {
+    log(DEBUG, "MQTT: disabled");
     return;
   }
-
-#if MQTT_USE_TLS
-  netClient.setInsecure();  // PoC: skip certificate validation
-  log(INFO, "MQTT: TLS enabled (insecure, no CA check)");
-#endif
-  client.setClient(netClient);
-  client.setServer(MQTT_BROKER, MQTT_PORT);
+  if (config.host.isEmpty()) {
+    log(WARNING, "MQTT: disabled because host is empty");
+    return;
+  }
+  deviceBaseTopic = deviceName;
+  configureClient();
   client.setBufferSize(MQTT_BUFFER_SIZE);
 
-  baseTopic = deviceName;
+  baseTopic = config.baseTopic.length() ? config.baseTopic : deviceBaseTopic;
   if (!baseTopic.endsWith("/"))
     baseTopic += "/";
 
   initialized = true;
-  log(INFO, "MQTT: init base topic %s broker=%s:%d", baseTopic.c_str(), MQTT_BROKER, MQTT_PORT);
+  log(INFO, "MQTT: init base topic %s broker=%s:%d tls=%s retain=%s",
+      baseTopic.c_str(), config.host.c_str(), config.port, config.useTls ? "on" : "off", config.retain ? "on" : "off");
 }
 
 void MqttPublisher::loop() {
-  if (!SEND2MQTT || !initialized)
+  if (!config.enabled || !initialized)
     return;
 
   if (!client.connected())
@@ -38,7 +39,7 @@ void MqttPublisher::loop() {
 }
 
 void MqttPublisher::ensureConnected() {
-  if (!SEND2MQTT || !initialized)
+  if (!config.enabled || !initialized)
     return;
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -53,34 +54,33 @@ void MqttPublisher::ensureConnected() {
 
   String clientId = "MultiGeiger-" + baseTopic;
   clientId.replace("/", "");  // keep it simple for broker
-  bool useAuth = strlen(MQTT_USERNAME) > 0;
+  bool useAuth = config.username.length() > 0;
   bool connected;
   if (useAuth)
-    connected = client.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD);
+    connected = client.connect(clientId.c_str(), config.username.c_str(), config.password.c_str());
   else
     connected = client.connect(clientId.c_str());
 
   if (connected) {
-    log(INFO, "MQTT: connected to %s:%d as %s", MQTT_BROKER, MQTT_PORT, clientId.c_str());
+    log(INFO, "MQTT: connected to %s:%d as %s", config.host.c_str(), config.port, clientId.c_str());
   } else {
     log(WARNING, "MQTT: connect failed rc=%d", client.state());
   }
 }
 
 bool MqttPublisher::publish(const String &topicSuffix, const String &payload) {
-  if (!SEND2MQTT || !initialized)
+  if (!config.enabled || !initialized)
     return false;
   if (!client.connected()) {
     log(DEBUG, "MQTT: client not connected, retrying");
     ensureConnected();
     if (!client.connected()) {
-      log(WARNING, "MQTT: publish skipped, still offline");
       return false;
     }
   }
 
   String topic = baseTopic + topicSuffix;
-  bool ok = client.publish(topic.c_str(), payload.c_str(), MQTT_RETAIN);
+  bool ok = client.publish(topic.c_str(), payload.c_str(), config.retain);
   if (!ok) {
     log(WARNING, "MQTT: publish failed for %s state=%d", topic.c_str(), client.state());
   } else {
@@ -98,10 +98,19 @@ void MqttPublisher::publishTimestamp(const String &topicSuffix) {
   publishValue(topicSuffix, String(utctime()));
 }
 
+void MqttPublisher::configureClient() {
+  activeClient = config.useTls ? static_cast<Client *>(&tlsClient) : static_cast<Client *>(&plainClient);
+  if (config.useTls) {
+    tlsClient.setInsecure();  // PoC: skip certificate validation
+  }
+  client.setClient(*activeClient);
+  client.setServer(config.host.c_str(), config.port);
+}
+
 void MqttPublisher::publishLive(float countRate, float doseRate, int counts, int dt_ms, int hv_pulses_delta,
                                 int accumulated_counts, int accumulated_time_ms, float accumulated_rate, float accumulated_dose,
                                 float temperature, float humidity, float pressure) {
-  if (!SEND2MQTT || !initialized)
+  if (!config.enabled || !initialized)
     return;
 
   if (!client.connected()) {
@@ -127,7 +136,7 @@ void MqttPublisher::publishLive(float countRate, float doseRate, int counts, int
 void MqttPublisher::publishMeasurement(const String &tubeType, int tubeNbr, unsigned int dt_ms, unsigned int hv_pulses,
                                        unsigned int gm_counts, unsigned int cpm, bool have_thp, float temperature,
                                        float humidity, float pressure, int wifi_status) {
-  if (!SEND2MQTT || !initialized)
+  if (!config.enabled || !initialized)
     return;
 
   if (!client.connected()) {

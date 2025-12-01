@@ -3,6 +3,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <DNSServer.h>
@@ -26,6 +27,15 @@ extern bool sendToMadavi;
 extern bool sendToLora;
 extern bool sendToBle;
 extern bool soundLocalAlarm;
+extern bool sendToMqtt;
+extern bool mqttUseTls;
+extern bool mqttRetain;
+extern uint16_t mqttPort;
+extern int mqttQos;
+extern char mqttHost[];
+extern char mqttUsername[];
+extern char mqttPassword[];
+extern char mqttBaseTopic[];
 
 extern char appeui[];
 extern char deveui[];
@@ -61,6 +71,7 @@ public:
   void beginWeb(bool loraHardware) { setup_webconf(loraHardware); }
   void beginTx(const char *version, char *chipSsid, bool loraHardware) { setup_transmission(version, chipSsid, loraHardware); }
   void pollTx() { poll_transmission(); }
+  void pollWeb() { iotWebConf.doLoop(); }
   void send(const String &tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
             int have_thp, float temperature, float humidity, float pressure, int wifi_status) {
     transmit_data(tube_type, tube_nbr, dt, hv_pulses, gm_counts, cpm, have_thp, temperature, humidity, pressure, wifi_status);

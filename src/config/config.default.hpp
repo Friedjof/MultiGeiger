@@ -49,19 +49,16 @@
 #define SEND2SENSORCOMMUNITY true
 
 // Send data via MQTT?
-// Proof-of-concept: configure broker/credentials below and payload will be published every measurement interval.
+// Defaults for the WebUI; can be overridden and saved at runtime.
 #define SEND2MQTT false
-
-// MQTT broker configuration (manual for now, later via WebUI)
 #define MQTT_BROKER "192.168.1.10"
 #define MQTT_PORT 1883
 #define MQTT_USERNAME ""
 #define MQTT_PASSWORD ""
-// TLS is currently optional and uses a shared CA cert string in code when enabled.
 #define MQTT_USE_TLS false
-// QoS 0 or 1 (PubSubClient limitation); retain flag for published messages.
 #define MQTT_QOS 0
 #define MQTT_RETAIN false
+#define MQTT_BASE_TOPIC ""
 
 // Send data via LoRa to TTN?
 // Only for devices with LoRa, automatically deactivated for devices without LoRa.
@@ -104,7 +101,7 @@
 #define SENSORCOMMUNITY_URL "http://api.sensor.community/v1/push-sensor-data/"
 #define CUSTOMSRV_URL "https://ptsv2.com/t/xxxxx-yyyyyyyyyy/post"
 #define SEND2CUSTOMSRV false
-#define CONFIG_VERSION "015"
+#define CONFIG_VERSION "016"
 
 // Web config checkboxes have 'selected' if checked, so we need 9 byte for this string.
 #define CHECKBOX_LEN 9

@@ -25,7 +25,18 @@ void MultiGeigerController::begin() {
   wifi.beginWeb(isLoraBoard);
   io.setupSpeaker(playSound, ledTick && switches_state.led_on, speakerTick && switches_state.speaker_on);
   wifi.beginTx(VERSION_STR, ssid, isLoraBoard);
-  mqtt.begin(ssid);
+  MqttConfig mqttCfg{
+    .enabled = sendToMqtt,
+    .host = String(mqttHost),
+    .port = mqttPort,
+    .useTls = mqttUseTls,
+    .username = String(mqttUsername),
+    .password = String(mqttPassword),
+    .retain = mqttRetain,
+    .qos = mqttQos,
+    .baseTopic = String(mqttBaseTopic)
+  };
+  mqtt.begin(mqttCfg, ssid);
   ble.begin(ssid, sendToBle && switches_state.ble_on);
   setup_log_data(SERIAL_DEBUG);
   sensors.beginTube();
@@ -217,6 +228,7 @@ void MultiGeigerController::loopOnce() {
   updateBleStatus();
 
   wifi.pollTx();
+  wifi.pollWeb();
   mqtt.loop();
 
   publish(current_ms, gm_counts, gm_count_timestamp, hv_pulses, temperature, humidity, pressure);
