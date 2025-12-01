@@ -198,3 +198,5 @@ node_modules/
 NOTES.md
 TODO.local.md
 scratch/
+
+tools/mqtt_logger/report.png

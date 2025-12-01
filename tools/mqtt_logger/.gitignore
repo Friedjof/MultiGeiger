@@ -4,6 +4,8 @@
 # Database
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Logs
 *.log
@@ -15,6 +17,5 @@ __pycache__/
 .venv/
 .uv/
 
-# IDE
-.vscode/
-.idea/
+# Exports
+*.csv
