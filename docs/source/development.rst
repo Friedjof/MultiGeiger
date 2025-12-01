@@ -46,7 +46,32 @@ Some guidance for contributors:
 Building a development environment
 ----------------------------------
 
-TODO
+Requirements:
+
+- Python 3, PlatformIO CLI (``pio``) and ``make`` in your ``PATH``.
+- A serial connection to the Heltec board you want to flash.
+- ``uv`` installed for Python env/dependency management (https://github.com/astral-sh/uv#installation). ``make setup`` uses it to provision ``.venv`` with Sphinx.
+
+Quick start (default PlatformIO environment: ``geiger``):
+
+.. code-block:: bash
+
+   make setup    # copy src/config/config.default.hpp -> src/config/config.hpp (if missing) AND install docs deps into .venv via uv
+   make build    # compile
+   make flash    # upload firmware
+   make monitor  # 115200 Baud serial console
+
+Adjust ``src/config/config.hpp`` for your hardware (tube type, targets to send to, display/sound/LED toggles, alarm thresholds). LoRa hardware is auto-detected at boot; DIP switches are latched once and combine with your build-time flags.
+
+Project layout
+--------------
+
+- ``src/app``: ``MultiGeigerController`` entry point (setup + loop coordination).
+- ``src/core``: logging, data logging helpers, UTC/clock helpers, ``VERSION_STR``.
+- ``src/config``: versioned defaults (``config.default.hpp``) and your local ``config.hpp``.
+- ``src/drivers``: hardware abstraction (IO + DIP switches + speaker/LED ticks, GM tube ISR + HV handling + THP sensors, OLED status/values, clock, board HAL).
+- ``src/comm``: WiFi config portal + HTTP uploads (sensor.community, madavi, custom), LoRa/TTN glue, BLE Heart-Rate notifications.
+- ``docs``: Sphinx sources (English master, translations via Transifex).
 
 Automatic Code Formatter
 ------------------------
@@ -57,7 +82,7 @@ Run it like this:
 
 ::
 
-  astyle --options=.astylerc 'multigeiger/\*'
+  astyle --options=.astylerc 'src/\*'
 
 .. _astyle: http://astyle.sourceforge.net/
 
@@ -78,10 +103,11 @@ To build the docs, you need to have Sphinx_ installed and run:
 
 ::
 
-  cd docs/
-  make html
+  make docs   # uses uv-provisioned .venv/.docs-installed stamp
 
 Then point a web browser at ``docs/build/html/index.html``.
+
+To clean doc build artifacts: ``make docs-clean``.
 
 The website is updated automatically by ReadTheDocs through GitHub web hooks on the
 main repository.
@@ -128,21 +154,12 @@ This will trigger a build of the docs and their translation(s) on readthedocs.io
 Flashing devices / creating binaries
 ------------------------------------
 
-Arduino IDE:
+PlatformIO:
 
-- do a git checkout of the wanted release, e.g. ``git checkout V1.13.0``
-- use the default userdefines.h (available as userdefines-example.h)
-- IDE settings:
-
-  - Device: Heltec WiFi Stick  (always use this, even if you have a WiFi Kit 32)
-  - Flash size: 4MB (32Mb)
-  - Partition scheme: minimal SPIFFS (large APPS with OTA) - this fits onto 4MB devices.
-- ``Arduino IDE -> Sketch -> Upload``
-
-  This is to test whether the compiled code actually works after USB-flashing to your device.
-- ``Arduino IDE -> Sketch -> Export compiled binary``
-
-  This creates a .bin file for OTA updating. Test whether OTA updating using that file works.
+- Build: ``make build`` (or ``pio run -e geiger``)
+- Flash over USB: ``make flash``
+- Serial monitor: ``make monitor``
+- OTA: open the device config page (``/config``) and upload ``.pio/build/geiger/firmware.bin`` produced by the build step.
 
 
 .. _releasing:

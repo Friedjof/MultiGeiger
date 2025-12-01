@@ -1,74 +1,45 @@
 Setup
 -----
 
-Download and unpack the latest release from GitHub (
-https://github.com/ecocurious/MultiGeiger/releases ) as source code
-(zip) or source code (tar.gz). In the new directory, open the directory
-*multigeiger* and load the file *multigeiger.ino* with the Arduino IDE.
+Recommended toolchain: PlatformIO CLI (via the included ``Makefile``).
 
-The board supports two different Heltec devices, different counting
-tubes and optionally a sensor for ambient temperature, air pressure, and
-humidity (BME280 or BME680). The software can send data via network to
-different services.
+1. Clone the repository and install PlatformIO (`pio`) and ``make`` in your ``PATH``.
+2. Prepare your local configuration:
 
--  **Heltec WiFi Kit 32** This MCU has WiFi, a large display and plugged
-   into the longer female connectors on the board.
+   .. code-block:: bash
 
--  **Heltec Wireless Stick** This MCU has a very small display, and
-   provides LoRa beside WiFi. It must be plugged into the shorter female
-   headers on the board.
+      make setup  # copies src/config/config.default.hpp -> src/config/config.hpp
 
-To select the Heltec boards in the Arduino IDE, the following steps must
-be taken: 
+   Adjust ``src/config/config.hpp`` to your hardware. Important switches:
 
--  Add the file: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_dev_index.json in Preferences->Additional Boards Manager URLs. 
--  Then, the ESP32 boards (name “esp32 by Espressif Systems”) can be installed under Tools->Board->Boards Manager. Choose the correct Heltec board under Tools->Board.  
--  Select the **Heltec wireless Stick** for **both** boards. 
--  If you use arduino-esp32 >= 1.0.5, you might need to apply a patch to get back the "partition scheme" menu
-   needed in the next step, see the ``misc/arduino-esp32/paritition-menu-*.*`` files in our git repo.
--  Select under Tools **Flash size: “4MB(32Mb)”** and **Partition Scheme: “Minimal SPIFFS (Large APPS with OTA)”**. The software recognizes automatically which board is equipped.
+   - ``TUBE_TYPE``: SBM20, SBM19, Si22G.
+   - Network targets: ``SEND2SENSORCOMMUNITY``, ``SEND2MADAVI``, ``SEND2LORA``, ``SEND2BLE``.
+   - UI/alarms: ``SHOW_DISPLAY``, ``PLAY_SOUND``, ``SPEAKER_TICK``, ``LED_TICK``, ``LOCAL_ALARM_SOUND``, ``LOCAL_ALARM_THRESHOLD``, ``LOCAL_ALARM_FACTOR``.
+   - Debug: ``DEBUG_SERVER_SEND`` for HTTP request logging.
 
-Various software settings can be made via the following files (see
-comments inside):
+3. Build/flash/monitor with the provided targets (default PlatformIO environment ``geiger`` uses the Heltec Wireless Stick board definition):
 
--  **./multigeiger/userdefines.h** (always necessary, an example is
-   provided in userdefines-example.h)
--  **./platformio.ini** (only for platformio, an example is provided in
-   platformio-example.ini)
+   - ``make build`` – compile
+   - ``make flash`` – upload firmware
+   - ``make monitor`` – serial console (115200 Baud)
+   - ``make run`` – flash + monitor
 
-All external libraries are required, which are listed in the file
+   You can override the PlatformIO environment with ``ENV=<name>``.
 
-::
+Hardware variants
+#################
 
-   platformio-example.ini
+The firmware auto-detects LoRa hardware via ``HWTESTPIN`` and adjusts the display layout and DIP switch pinout accordingly. The two supported Heltec modules are:
 
-under the section
+-  **Heltec WiFi Kit 32**: WiFi-only, larger display.
+-  **Heltec Wireless Stick**: WiFi + LoRa, small display.
 
-::
+Runtime DIP switches (read once at boot) combine with your compile-time flags:
 
-   lib-deps =
-
-Please install the latest version via platform.io / Libraries.
-
-**Caution:** If the Arduino IDE is used, please check that in the file project_config/lmic_project_config.h (in the top level in this library) the correct configurations are set. The file must look like this:
-
-::
-
-   // project-specific definitions
-   #define CFG_eu868 1
-   //#define CFG_us915 1
-   //#define CFG_au921 1
-   //#define CFG_as923 1
-   // #define LMIC_COUNTRY_CODE LMIC_COUNTRY_CODE_JP /* for as923-JP */
-   //#define CFG_in866 1
-   #define CFG_sx1276_radio 1
-   //#define LMIC_USE_INTERRUPTS
-
-The specified versions of the libraries are the minimum requirements. We
-always test with the latest versions too, so please always install and
-use the latest versions. If the compiler reminds other libraries, please
-install them in the Arduino IDE via *Sketch -> Include Library -> Manage
-Libraries ..*.
+- SW0 ``speaker_on``: enable tick/alarm if ``SPEAKER_TICK``/``PLAY_SOUND`` allow it.
+- SW1 ``display_on``: enable OLED if ``SHOW_DISPLAY`` is true.
+- SW2 ``led_on``: enable white LED tick if ``LED_TICK`` is true.
+- SW3 ``ble_on``: enable BLE advertising if ``SEND2BLE`` is true.
 
 Procedure after startup
 #######################
@@ -90,6 +61,8 @@ The settings page has the following lines:
    This is the SSID of the built-in AP and can be changed. If the sensor was already registered with this number at sensor.community, a new registration is mandatory.
 -  Geiger accesspoint password
    This is the password for the built-in AP. It **MUST** be changed the first time. If desired, the default password **ESP32Geiger** can be used again. The field must not be left blank. Save the password to your favourite password manager.
+-  Admin user
+   Fixed username: **admin**. The admin password is the same as the AP password above. There is no separate HTTP Basic Auth field in the portal; change the AP password to change the web login password.
 -  WiFi client SSID
    Here you have to enter the SSID of the WLAN you want to connect for network/internet access. 
 -  WiFi client password And here the corresponding password.
