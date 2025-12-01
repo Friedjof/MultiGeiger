@@ -1,5 +1,200 @@
+# ============================================================================
+# MultiGeiger .gitignore
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# User Configuration (device-specific, should not be committed)
+# ----------------------------------------------------------------------------
 src/config/config.hpp
+
+# ----------------------------------------------------------------------------
+# Build Artifacts (PlatformIO)
+# ----------------------------------------------------------------------------
 .pio/
+.pioenvs/
+.piolibdeps/
+
+# Compiled binaries
+*.bin
+*.elf
+*.hex
+*.map
+
+# Firmware backups
+firmware_backup/
+*.bin.backup
+
+# ----------------------------------------------------------------------------
+# IDE / Editor
+# ----------------------------------------------------------------------------
+
+# VSCode
 .vscode/
+*.code-workspace
+
+# CLion / IntelliJ
+.idea/
+cmake-build-*/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ----------------------------------------------------------------------------
+# Python / Documentation
+# ----------------------------------------------------------------------------
+
+# Virtual environments
 .venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Sphinx documentation
 docs/build/
+docs/_build/
+docs/.buildinfo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ----------------------------------------------------------------------------
+# Tools / Scripts
+# ----------------------------------------------------------------------------
+
+# MQTT Logger
+tools/.env
+tools/*.db
+tools/*.db-journal
+tools/*.log
+tools/.uv/
+
+# Data exports
+tools/exports/
+tools/data/
+*.csv.backup
+
+# ----------------------------------------------------------------------------
+# Logs and Databases
+# ----------------------------------------------------------------------------
+
+# Application logs
+*.log
+*.log.*
+logs/
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ----------------------------------------------------------------------------
+# Temporary Files
+# ----------------------------------------------------------------------------
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# ----------------------------------------------------------------------------
+# Operating System
+# ----------------------------------------------------------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ----------------------------------------------------------------------------
+# Security / Secrets
+# ----------------------------------------------------------------------------
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# Credentials
+credentials.json
+secrets.json
+*.key
+*.pem
+*.crt
+
+# ----------------------------------------------------------------------------
+# Testing / Development
+# ----------------------------------------------------------------------------
+
+# Test outputs
+test_output/
+test_results/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Profiling
+*.prof
+
+# ----------------------------------------------------------------------------
+# Miscellaneous
+# ----------------------------------------------------------------------------
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Node modules (if any JS tools are used)
+node_modules/
+
+# Package manager locks (keep pyproject.toml, ignore lock files for now)
+# Uncomment if you want to track lock files:
+# uv.lock
+# Pipfile.lock
+
+# Local notes
+NOTES.md
+TODO.local.md
+scratch/
