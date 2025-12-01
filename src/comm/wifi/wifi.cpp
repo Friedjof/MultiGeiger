@@ -533,6 +533,23 @@ void handleRoot(void) {  // Handle web requests to "/" path.
     // -- Captive portal requests were already served.
     return;
   }
+
+  // looks like user wants to do some configuration or maybe flash firmware.
+  // while accessing the flash, we need to turn ticking off to avoid exceptions.
+  // user needs to save the config (or flash firmware + reboot) to turn it on again.
+  // note: it didn't look like there is an easy way to put this call at the right place
+  // (start of fw flash / start of config save) - this is why it is here.
+  tick_enable(false);
+
+  // Auto-redirect to config page in AP mode (Captive Portal behavior)
+  if (iotWebConf.getState() == iotwebconf::ApMode) {
+    log(INFO, "Captive portal: redirecting to /config");
+    server.sendHeader("Location", "/config");
+    server.send(302, "text/plain", "");
+    return;
+  }
+
+  // Normal landing page when in STA mode
   const char *index =
     "<!DOCTYPE html>"
     "<html lang='en'>"
@@ -549,22 +566,17 @@ void handleRoot(void) {  // Handle web requests to "/" path.
     "Go to the <a href='config'>config page</a> to change settings or update firmware."
     "</p>"
     "<p style='font-size:smaller'>Login: user <code>admin</code>, password = AP password"
-    " <span class='hint' title='Change the AP password under “Geiger accesspoint password”. Default: ESP32Geiger'>?</span>"
+    " <span class='hint' title='Change the AP password under &quot;Geiger accesspoint password&quot;. Default: ESP32Geiger'>?</span>"
     "</p>"
     "</body>"
     "</html>\n";
   server.send(200, "text/html;charset=UTF-8", index);
-  // looks like user wants to do some configuration or maybe flash firmware.
-  // while accessing the flash, we need to turn ticking off to avoid exceptions.
-  // user needs to save the config (or flash firmware + reboot) to turn it on again.
-  // note: it didn't look like there is an easy way to put this call at the right place
-  // (start of fw flash / start of config save) - this is why it is here.
-  tick_enable(false);
 }
 
 static char lastWiFiSSID[IOTWEBCONF_WORD_LEN] = "";
 static WiFiEventId_t wifiEventId;
-static WiFiEventId_t apEventId;
+static WiFiEventId_t apConnectEventId;
+static WiFiEventId_t apDisconnectEventId;
 
 static bool hasConfiguredWifi() {
   const char *cfgSsid = iotWebConf.getWifiSsidParameter()->valueBuffer;
@@ -587,16 +599,26 @@ static void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
   // The regular doLoop will push us back to Connecting state.
 }
 
-static void onApClientEvent(arduino_event_id_t event, arduino_event_info_t info) {
-  if (event != ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)
-    return;
-  if (!hasConfiguredWifi())
-    return;
-  if (iotWebConf.getState() != iotwebconf::ApMode)
+static void onApClientConnectEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event != ARDUINO_EVENT_WIFI_AP_STACONNECTED)
     return;
 
-  log(INFO, "AP client disconnected, try STA reconnect");
-  iotWebConf.forceApMode(false);  // will change state to Connecting if allowed
+  log(INFO, "AP client connected, keeping AP open indefinitely");
+  // Disable AP timeout when client connects - keep AP open
+  iotWebConf.setApTimeoutMs(0);  // 0 = no timeout, AP stays open
+}
+
+static void onApClientDisconnectEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event != ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)
+    return;
+
+  log(INFO, "AP client disconnected");
+
+  // If WiFi STA is configured, switch to STA mode
+  if (hasConfiguredWifi() && iotWebConf.getState() == iotwebconf::ApMode) {
+    log(INFO, "WiFi STA configured, switching to STA mode");
+    iotWebConf.forceApMode(false);  // will change state to Connecting if allowed
+  }
 }
 
 void loadConfigVariables(void) {
@@ -697,29 +719,34 @@ void setup_webconf(bool loraHardware) {
     iotWebConf.saveConfig();
   }
 
+  // Always start AP for 30 seconds on boot (gives user time to configure WiFi)
+  iotWebConf.setApTimeoutMs(30000);              // AP timeout: 30 seconds if no client connects
+  iotWebConf.setWifiConnectionTimeoutMs(20000);  // STA connect timeout: 20 seconds
+
   if (hasConfiguredWifi()) {
-    iotWebConf.skipApStartup();               // prefer STA first
-    iotWebConf.setWifiConnectionTimeoutMs(15000);  // STA connect timeout -> fall back to AP
-    iotWebConf.setApTimeoutMs(15000);              // if we end up in AP, retry STA after timeout
-    iotWebConf.forceApMode(false);                 // ensure we are allowed to leave AP
+    iotWebConf.forceApMode(false);  // allow leaving AP mode to connect to STA
   }
 
   wifiEventId = WiFi.onEvent(onWifiEvent);
-  apEventId = WiFi.onEvent(onApClientEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+  apConnectEventId = WiFi.onEvent(onApClientConnectEvent, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+  apDisconnectEventId = WiFi.onEvent(onApClientDisconnectEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
   (void)wifiEventId;  // suppress unused warning for now
-  (void)apEventId;
+  (void)apConnectEventId;
+  (void)apDisconnectEventId;
 
-  auto sendNoContent = []() {
-    server.send(204, "text/plain", "");
+  auto redirectToCaptivePortal = []() {
+    log(INFO, "Captive portal probe detected, redirecting to /config");
+    server.sendHeader("Location", "/config");
+    server.send(302, "text/plain", "");
   };
 
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
-  // Captive portal probes (Android/Windows/Apple)
-  server.on("/generate_204", HTTP_ANY, sendNoContent);      // Android
-  server.on("/gen_204", HTTP_ANY, sendNoContent);           // older Android variants
-  server.on("/hotspot-detect.html", HTTP_ANY, handleRoot);  // Apple
-  server.on("/ncsi.txt", HTTP_ANY, sendNoContent);          // Windows
+  // Captive portal probes (Android/Windows/Apple) - redirect to config page
+  server.on("/generate_204", HTTP_ANY, redirectToCaptivePortal);      // Android
+  server.on("/gen_204", HTTP_ANY, redirectToCaptivePortal);           // older Android variants
+  server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
+  server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
   server.on("/config", [] { iotWebConf.handleConfig(); });
   server.onNotFound([]() {
     // Quietly redirect captive-portal probes (e.g. connectivitycheck.gstatic.com) to root
