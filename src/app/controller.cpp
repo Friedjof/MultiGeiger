@@ -25,6 +25,7 @@ void MultiGeigerController::begin() {
   wifi.beginWeb(isLoraBoard);
   io.setupSpeaker(playSound, ledTick && switches_state.led_on, speakerTick && switches_state.speaker_on);
   wifi.beginTx(VERSION_STR, ssid, isLoraBoard);
+  mqtt.begin(ssid);
   ble.begin(ssid, sendToBle && switches_state.ble_on);
   setup_log_data(SERIAL_DEBUG);
   sensors.beginTube();
@@ -109,6 +110,9 @@ void MultiGeigerController::publish(unsigned long current_ms, unsigned long curr
     ble.update((unsigned int)(Count_Rate * 60));
     display.showGmc((unsigned int)(accumulated_time / 1000), (int)(accumulated_Dose_Rate * 1000), (int)(Count_Rate * 60),
                     (showDisplay && switches_state.display_on));
+    mqtt.publishLive(Count_Rate, Dose_Rate, counts, dt, hv_pulses_delta,
+                     accumulated_GMC_counts, accumulated_time, accumulated_Count_Rate, accumulated_Dose_Rate,
+                     temperature, humidity, pressure);
 
     if (soundLocalAlarm && GMC_factor_uSvph > 0) {
       if (accumulated_Dose_Rate > localAlarmThreshold) {
@@ -192,6 +196,8 @@ void MultiGeigerController::transmit(unsigned long current_ms, unsigned long cur
 
     wifi.send(tubes[TUBE_TYPE].type, tubes[TUBE_TYPE].nbr, dt, hv_pulses_delta, counts, current_cpm,
               have_thp_in, temperature_in, humidity_in, pressure_in, wifi_status);
+    mqtt.publishMeasurement(tubes[TUBE_TYPE].type, tubes[TUBE_TYPE].nbr, dt, hv_pulses_delta, counts, current_cpm,
+                            have_thp_in, temperature_in, humidity_in, pressure_in, wifi_status);
   }
 }
 
@@ -211,6 +217,7 @@ void MultiGeigerController::loopOnce() {
   updateBleStatus();
 
   wifi.pollTx();
+  mqtt.loop();
 
   publish(current_ms, gm_counts, gm_count_timestamp, hv_pulses, temperature, humidity, pressure);
 

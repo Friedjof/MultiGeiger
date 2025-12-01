@@ -48,6 +48,21 @@
 // Should always be true so that the data is archived there. Standard server for devices without LoRa.
 #define SEND2SENSORCOMMUNITY true
 
+// Send data via MQTT?
+// Proof-of-concept: configure broker/credentials below and payload will be published every measurement interval.
+#define SEND2MQTT false
+
+// MQTT broker configuration (manual for now, later via WebUI)
+#define MQTT_BROKER "192.168.1.10"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME ""
+#define MQTT_PASSWORD ""
+// TLS is currently optional and uses a shared CA cert string in code when enabled.
+#define MQTT_USE_TLS false
+// QoS 0 or 1 (PubSubClient limitation); retain flag for published messages.
+#define MQTT_QOS 0
+#define MQTT_RETAIN false
+
 // Send data via LoRa to TTN?
 // Only for devices with LoRa, automatically deactivated for devices without LoRa.
 // If this is set to true, sending to Madavi and sensor.community should be deactivated!

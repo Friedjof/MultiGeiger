@@ -11,6 +11,7 @@
 #include "comm/ble/ble.hpp"
 #include "comm/wifi/wifi.hpp"
 #include "comm/lora/loraWan.hpp"
+#include "comm/mqtt/mqtt.hpp"
 
 class MultiGeigerController {
 public:
@@ -34,6 +35,7 @@ private:
   DisplayModule display;
   BleService ble;
   WifiManager wifi;
+  MqttPublisher mqtt;
   ClockModule clock;
 
   bool isLoraBoard = false;
