@@ -3,7 +3,33 @@
 Changelog
 =========
 
-V1.17.0-dev 2021-xx-xx
+V1.18.0-dev 2025-xx-xx
+----------------------
+
+New features:
+
+* **WiFi Captive Portal**: Automatic redirection to configuration page when connecting to AP
+* **Always-on AP Mode**: AP now opens for 30 seconds on every boot, regardless of WiFi configuration
+* **Persistent AP Mode**: AP remains open indefinitely when a client is connected
+* **MQTT Support**: Proof-of-concept MQTT publishing functionality with TLS support
+
+Improvements:
+
+* **Immediate Settings Application**: LED, speaker, and display settings are now applied immediately after saving, without requiring a reboot
+* **Improved WiFi Flow**: Automatic STA reconnection after AP client disconnect (if WiFi credentials configured)
+* **WiFi Timeout**: Increased STA connection timeout to 20 seconds
+
+Fixes:
+
+* Fixed LED continuing to blink after being disabled in web configuration
+* Fixed display not updating after being re-enabled in web configuration
+
+Other changes:
+
+* Refactored WiFi event handling with separate connect/disconnect handlers
+* Added controller methods for runtime settings updates
+* Global controller instance for configuration callbacks
+
 ----------------------
 
 New features:

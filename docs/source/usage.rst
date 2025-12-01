@@ -159,3 +159,19 @@ While testing, please keep in mind that an update packet is sent only every ~10s
 +----------+----------+----------+
 
 
+MQTT Publishing
+###############
+
+The MultiGeiger can publish measurement data to an MQTT broker in real-time. This enables integration with home automation systems like Home Assistant, IoT platforms, and custom data logging solutions.
+
+For detailed MQTT configuration, topic structure, and integration examples, see the dedicated :doc:`mqtt` page.
+
+Quick overview:
+
+- **Configuration**: Via web interface at ``/config`` under "MQTT Settings"
+- **Topics**: All data published under ``<baseTopic>/live/<metric>`` (e.g., ``ESP32-51564452/live/dose_rate_uSvph``)
+- **Data types**: Radiation measurements (CPM, dose rate), environmental data (temperature, humidity, pressure), system status
+- **Update interval**: Same as HTTP transmission (default: 150 seconds)
+- **Features**: TLS support, authentication, configurable QoS, retained messages
+
+Note: MQTT publishing does not have a dedicated status indicator on the OLED display. Connection status is logged via serial output and available in the ``status`` JSON topic.

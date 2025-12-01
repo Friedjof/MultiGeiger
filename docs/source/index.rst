@@ -19,6 +19,7 @@ MultiGeiger Documentation
    setup
    setup_lora
    usage
+   mqtt
    deployment
    faq
    resources

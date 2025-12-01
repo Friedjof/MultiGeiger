@@ -1,0 +1,6 @@
+# MQTT Logger Requirements
+paho-mqtt>=1.6.1
+
+# Optional: For advanced data analysis
+# pandas>=1.3.0
+# matplotlib>=3.4.0

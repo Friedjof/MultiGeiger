@@ -44,27 +44,16 @@ Runtime DIP switches (read once at boot) combine with your compile-time flags:
 Procedure after startup
 #######################
 
-The device establishes its own WiFi access point (AP) on every boot. The SSID of the AP is **ESP32-xxxxxx**, where the xxx are the chip ID (or MAC address) of the WiFi chip (example: **ESP32-51564452**). **Please write down this number, it will be needed later.**
-
-**New WiFi behavior (firmware 1.18+):**
-
-- The AP opens **automatically on every boot** for 30 seconds, regardless of whether WiFi credentials are configured.
-- If a client connects to the AP, the AP **remains open indefinitely** until the client disconnects.
-- When the client disconnects and WiFi STA credentials are configured, the device **automatically switches to STA mode**.
-- If no client connects within 30 seconds and WiFi STA is configured, the device switches to STA mode automatically.
-- This gives you a 30-second window to reconfigure WiFi on every boot, even if WiFi credentials are already set.
+The device establishes its own WiFi access point (AP). The SSID of the AP is **ESP32-xxxxxx**, where the xxx are the chip ID (or MAC address) of the WiFi chip (example: **ESP32-51564452**). **Please write down this number, it will be needed later.** 
+This access point remains active for 30 sec. After that the device tries to connect to the (previously) defined WiFi netwword. 
+This connection attempt also takes 30sec. If no connection could be established, the own AP is created again and the process starts again and again.
 
 Configuring the device via WiFi
 ###############################
 
-After the WiFi AP of the device appears on your cell phone or computer, connect to it. The connection asks for a password, it is **ESP32Geiger**.
-
-**Captive Portal (firmware 1.18+):**
-
-The device now features a **captive portal** that automatically redirects you to the configuration page when you connect to the AP. On most devices (smartphones, tablets, laptops), a browser window will automatically open showing the configuration page. If this doesn't happen automatically, you can manually navigate to **192.168.4.1** in your browser.
-
-The configuration page will open automatically, showing all available settings.
-
+After the WiFi AP of the device appears on your cell phone or computer, connect to it. The connection asks for a password, it is **ESP32Geiger**. 
+The start page of the device opens usually **automatically**.
+If the start page does not appear, you have to call the address **192.168.4.1** with a browser. The start page appears, where you can’t miss the link to the **configure page** , click on it and you enter the settings page.
 
 The settings page has the following lines: 
 
@@ -89,12 +78,10 @@ re-entered**. In future versions this step shall become obsolete.
 
 Furthermore, the following options can be defined on the settings page:
 
--  Start melody, speaker tick, LED tick and display on/off. **Note (firmware 1.18+):** These settings are now **applied immediately** after saving, without requiring a reboot. The settings respect DIP switch states (SW0=speaker, SW1=display, SW2=LED).
+-  Start melody, speaker tick, LED tick and display on/off.
 -  Send data to sensor.community or/and to madavi.de
--  MQTT broker configuration (host, port, TLS, credentials, topics)
 -  If LoRa hardware is available: the LoRa parameters (DEVEUI, APPEUI
    and APPKEY) can be entered here.
-
 
 The firmware on the MultiGeiger can be updated with the link **Firmware update** at the End of the settings page. Download the .bin file, select it via **Browse…** and click **Update**. It will take roughly 30sec for uploading and flashing the firmware. If you see **Update Success! Rebooting…**, the MultiGeiger will reboot and the new firmware will be active.
 
