@@ -1,5 +1,4 @@
-#ifndef _LORAWAN_H_
-#define _LORAWAN_H_
+#pragma once
 
 #include <Arduino.h>
 #include <lmic.h>
@@ -42,5 +41,3 @@ public:
     return lorawan_send(txPort, txBuffer, txSz, ack, rxPort, rxBuffer, rxSz);
   }
 };
-
-#endif // _LORAWAN_H_

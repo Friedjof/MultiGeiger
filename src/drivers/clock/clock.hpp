@@ -1,5 +1,4 @@
-#ifndef CLOCK_H
-#define CLOCK_H
+#pragma once
 
 #include <Arduino.h>
 #include <time.h>
@@ -22,5 +21,3 @@ public:
   void begin(time_t timestamp = 0) { setup_clock(timestamp); }
   char *utc() { return utctime(); }
 };
-
-#endif

@@ -59,4 +59,4 @@ html_static_path = ['_static']
 # stuff recommended by readthedocs.io "Manage translations" docs
 gettext_uuid = True
 gettext_compact = False
-locale_dirs = ['../../locales/']
+locale_dirs = ['../locales/']

@@ -1,5 +1,6 @@
-#include "drivers/sensors/sensors.hpp"
-#include "driver/gpio.h"
+#include "sensors.hpp"
+
+#include <driver/gpio.h>
 
 // THP sensor handling
 

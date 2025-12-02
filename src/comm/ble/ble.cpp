@@ -6,7 +6,7 @@
 // Based on Neil Kolban's example file: https://github.com/nkolban/ESP32_BLE_Arduino
 // Based on Andreas Spiess' example file: https://github.com/SensorsIot/Bluetooth-BLE-on-Arduino-IDE/blob/master/Polar_H7_Sensor/Polar_H7_Sensor.ino
 
-#include "comm/ble/ble.hpp"
+#include "ble.hpp"
 
 #define BLE_SERVICE_HEART_RATE    BLEUUID((uint16_t)0x180D)  // 16 bit UUID of Heart Rate Service
 #define BLE_CHAR_HR_MEASUREMENT   BLEUUID((uint16_t)0x2A37)  // 16 bit UUID of Heart Rate Measurement Characteristic

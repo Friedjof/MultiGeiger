@@ -1,7 +1,14 @@
-// OLED display related code
+/**
+ * @file display.hpp
+ * @brief OLED display driver and status indicator management
+ *
+ * Controls the SSD1306 OLED display for showing:
+ * - Radiation measurements (CPM, dose rate)
+ * - Subsystem status indicators (WiFi, BLE, LoRa, MQTT, sensors)
+ * - Device information and diagnostics
+ */
 
-#ifndef _DISPLAY_H_
-#define _DISPLAY_H_
+#pragma once
 
 #include <Arduino.h>
 #include <U8x8lib.h>
@@ -109,5 +116,3 @@ void display_statusline(String txt);
 void set_status(int index, int value);
 int get_status(int index);
 void display_status(void);
-
-#endif // _DISPLAY_H_

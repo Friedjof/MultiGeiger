@@ -3,8 +3,10 @@
 // - via LoRa to TTN (to internet servers)
 
 #include "wifi.hpp"
-#include "app/controller.hpp"
+
 #include <string.h>
+
+#include "app/controller.hpp"
 
 extern MultiGeigerController controller;
 

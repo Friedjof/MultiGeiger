@@ -1,3 +1,12 @@
+/**
+ * @file controller.hpp
+ * @brief Main controller for the MultiGeiger device
+ *
+ * This file contains the MultiGeigerController class which orchestrates
+ * all hardware modules (sensors, display, communication) and manages the
+ * main measurement loop.
+ */
+
 #pragma once
 
 #include <Arduino.h>
@@ -13,11 +22,30 @@
 #include "comm/lora/loraWan.hpp"
 #include "comm/mqtt/mqtt.hpp"
 
+/**
+ * @class MultiGeigerController
+ * @brief Main controller coordinating all device subsystems
+ *
+ * Manages initialization, measurement cycles, sensor reading, data transmission,
+ * and user interface (display, speaker) for the MultiGeiger radiation detector.
+ */
 class MultiGeigerController {
 public:
+  /** @brief Initialize all subsystems (sensors, display, communication) */
   void begin();
+
+  /** @brief Execute one iteration of the main measurement loop */
   void loopOnce();
+
+  /** @brief Update LED and speaker tick settings
+   *  @param ledTick Enable/disable LED tick on radiation detection
+   *  @param speakerTick Enable/disable speaker tick on radiation detection
+   */
   void applyTickSettings(bool ledTick, bool speakerTick);
+
+  /** @brief Update display on/off setting
+   *  @param showDisplay Enable/disable OLED display
+   */
   void applyDisplaySetting(bool showDisplay);
 
 private:

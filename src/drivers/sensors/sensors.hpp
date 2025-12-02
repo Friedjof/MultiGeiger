@@ -1,4 +1,12 @@
-// Sensor-related code: GM tube handling and THP sensor support.
+/**
+ * @file sensors.hpp
+ * @brief Sensor interface for GM tube and environmental sensors
+ *
+ * Provides interfaces for:
+ * - Geiger-Müller tube radiation detection
+ * - Temperature, Humidity, Pressure (THP) sensors (BME280/BME680)
+ * - High voltage monitoring
+ */
 
 #pragma once
 
@@ -11,10 +19,14 @@
 #include "drivers/io/io.hpp"
 #include "config/config.hpp"
 
+/**
+ * @struct TUBETYPE
+ * @brief Geiger-Müller tube type definition
+ */
 typedef struct {
-  const char *type;          // type string for sensor.community
-  const char nbr;            // number to be sent by LoRa
-  const float cps_to_uSvph;  // factor to convert counts per second to µSievert per hour
+  const char *type;          ///< Tube type string for sensor.community API
+  const char nbr;            ///< Tube type number for LoRa transmission
+  const float cps_to_uSvph;  ///< Conversion factor: counts/sec to µSievert/hour
 } TUBETYPE;
 
 extern TUBETYPE tubes[];

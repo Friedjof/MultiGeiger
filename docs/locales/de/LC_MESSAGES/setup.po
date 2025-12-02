@@ -106,12 +106,12 @@ msgstr ""
 #: ../../source/setup.rst:27 5703a7993dce4b5f84263853e7853699
 msgid ""
 "If you use arduino-esp32 >= 1.0.5, you might need to apply a patch to get "
-"back the \"partition scheme\" menu needed in the next step, see the ``misc"
+"back the \"partition scheme\" menu needed in the next step, see the ``patches"
 "/arduino-esp32/paritition-menu-*.*`` files in our git repo."
 msgstr ""
 "Wenn Du arduino-esp32 >= 1.0.5 benutzt, musst Du ggf. einen Patch anwenden, "
 "um das \"partition scheme\"-Menü, das im nächsten Schritt gebraucht wird, "
-"wieder zurück zu bekommen - siehe die Dateien ``misc/arduino-esp32"
+"wieder zurück zu bekommen - siehe die Dateien ``patches/arduino-esp32"
 "/paritition-menu-*.*`` in unserem git-Repo."
 
 #: ../../source/setup.rst:29 285ad34dad674e0f9c274d2677362341

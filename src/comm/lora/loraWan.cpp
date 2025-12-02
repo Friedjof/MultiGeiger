@@ -1,4 +1,4 @@
-#include "comm/lora/loraWan.hpp"
+#include "loraWan.hpp"
 
 // Compile this only if we have a LoRa capable hardware
 

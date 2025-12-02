@@ -1,5 +1,6 @@
 #include "io.hpp"
-#include "driver/gpio.h"
+
+#include <driver/gpio.h>
 
 // Hardware detection pin comes from config.hpp
 

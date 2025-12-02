@@ -142,7 +142,7 @@ Now we have changes in our git workdir and we need to commit them:
 
 ::
 
-  git add locales/
+  git add docs/locales/
   git commit -m "updated translations"
   git push
 

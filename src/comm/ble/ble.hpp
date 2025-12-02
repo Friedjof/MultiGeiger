@@ -1,8 +1,13 @@
-// Code related to the transmission of the measured data via Bluetooth Low Energy,
-// uses GATT Heart Rate Measurement Service for notifications with CPM update.
+/**
+ * @file ble.hpp
+ * @brief Bluetooth Low Energy (BLE) interface for CPM broadcasting
+ *
+ * Transmits radiation measurements via BLE using the GATT Heart Rate
+ * Measurement Service. The heart rate value represents Counts Per Minute (CPM).
+ * This allows standard heart rate monitor apps to display radiation levels.
+ */
 
-#ifndef _BLE_H_
-#define _BLE_H_
+#pragma once
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
@@ -29,5 +34,3 @@ private:
   uint8_t txBuffer_HRM[5];
   uint8_t txBuffer_HRPOS[1] = {TUBE_TYPE};
 };
-
-#endif // _BLE_H_

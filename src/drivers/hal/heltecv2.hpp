@@ -2,8 +2,7 @@
 // upload_speed 921600
 // board heltec_wifi_lora_32_V2
 
-#ifndef _HELTECV2_H
-#define _HELTECV2_H
+#pragma once
 
 #include <stdint.h>
 
@@ -42,5 +41,3 @@
 #define LORA_MOSI MOSI
 #define LORA_RST RST_LoRa
 #define LORA_CS SS
-
-#endif

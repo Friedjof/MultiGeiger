@@ -1,5 +1,10 @@
-// MQTT publishing (proof-of-concept).
-// Config is compile-time only for now (see config.default.hpp / config.hpp).
+/**
+ * @file mqtt.hpp
+ * @brief MQTT client for publishing measurement data
+ *
+ * Provides MQTT connectivity with TLS support for publishing
+ * radiation measurements to an MQTT broker.
+ */
 
 #pragma once
 
@@ -12,16 +17,20 @@
 #include "core/core.hpp"
 #include "config/config.hpp"
 
+/**
+ * @struct MqttConfig
+ * @brief Configuration structure for MQTT client
+ */
 struct MqttConfig {
-  bool enabled;
-  String host;
-  uint16_t port;
-  bool useTls;
-  String username;
-  String password;
-  bool retain;
-  int qos;
-  String baseTopic;
+  bool enabled;        ///< Enable/disable MQTT publishing
+  String host;         ///< MQTT broker hostname
+  uint16_t port;       ///< MQTT broker port
+  bool useTls;         ///< Use TLS/SSL encryption
+  String username;     ///< MQTT authentication username
+  String password;     ///< MQTT authentication password
+  bool retain;         ///< Set retain flag on published messages
+  int qos;             ///< Quality of Service level (0, 1, or 2)
+  String baseTopic;    ///< Base topic prefix for all publications
 };
 
 class MqttPublisher {

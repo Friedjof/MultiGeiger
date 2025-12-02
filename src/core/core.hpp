@@ -1,4 +1,13 @@
-// Core utilities: logging, data logging helpers, misc utils, version string.
+/**
+ * @file core.hpp
+ * @brief Core utilities for the MultiGeiger firmware
+ *
+ * Provides:
+ * - Logging system with configurable log levels
+ * - Data logging for measurements (table, one-minute, statistics formats)
+ * - Utility functions (hex conversion, byte array manipulation)
+ * - Firmware version information
+ */
 
 #pragma once
 
