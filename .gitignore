@@ -20,6 +20,9 @@ src/config/config.hpp
 *.hex
 *.map
 
+# Generated web assets
+src/comm/wifi/web_assets.h
+
 # Firmware backups
 firmware_backup/
 *.bin.backup
