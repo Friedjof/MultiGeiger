@@ -48,6 +48,24 @@ public:
    */
   void applyDisplaySetting(bool showDisplay);
 
+  /** @brief Get current radiation counts */
+  unsigned long getCounts() const { return gm_counts; }
+
+  /** @brief Get current temperature (°C) */
+  float getTemperature() const { return temperature; }
+
+  /** @brief Get current humidity (%) */
+  float getHumidity() const { return humidity; }
+
+  /** @brief Get current pressure (hPa) */
+  float getPressure() const { return pressure; }
+
+  /** @brief Check if environmental sensors are available */
+  bool hasThp() const { return have_thp; }
+
+  /** @brief Check for HV error */
+  bool hasHvError() const { return hv_error; }
+
 private:
   void setupNtp(int wifiStatus);
   int updateWifiStatus();

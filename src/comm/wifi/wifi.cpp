@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "app/controller.hpp"
+#include "web_assets.h"
 
 extern MultiGeigerController controller;
 
@@ -532,6 +533,42 @@ char *buildSSID() {
   return ssid;
 }
 
+/**
+ * @brief API endpoint for live status data (JSON)
+ */
+void handleApiStatus(void) {
+  unsigned long counts = controller.getCounts();
+  float temp = controller.getTemperature();
+  float hum = controller.getHumidity();
+  float press = controller.getPressure();
+  bool thp = controller.hasThp();
+  bool hvErr = controller.hasHvError();
+
+  // Calculate CPM and dose rate (simplified calculation)
+  unsigned long uptime_ms = millis();
+  unsigned long uptime_s = uptime_ms / 1000;
+  float cpm = (uptime_s > 0) ? (counts * 60.0 / uptime_s) : 0.0;
+  float dose_rate = cpm * tubes[TUBE_TYPE].cps_to_uSvph / 60.0;  // µSv/h
+
+  String json = "{";
+  json += "\"counts\":" + String(counts) + ",";
+  json += "\"cpm\":" + String(cpm, 1) + ",";
+  json += "\"dose_uSvh\":" + String(dose_rate, 3) + ",";
+  json += "\"uptime_s\":" + String(uptime_s) + ",";
+  json += "\"hv_error\":" + String(hvErr ? "true" : "false") + ",";
+
+  if (thp) {
+    json += "\"temperature\":" + String(temp, 1) + ",";
+    json += "\"humidity\":" + String(hum, 1) + ",";
+    json += "\"pressure\":" + String(press, 1) + ",";
+  }
+
+  json += "\"has_thp\":" + String(thp ? "true" : "false");
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
 void handleRoot(void) {  // Handle web requests to "/" path.
   // -- Let IotWebConf test and handle captive portal requests.
   if (iotWebConf.handleCaptivePortal()) {
@@ -554,28 +591,8 @@ void handleRoot(void) {  // Handle web requests to "/" path.
     return;
   }
 
-  // Normal landing page when in STA mode
-  const char *index =
-    "<!DOCTYPE html>"
-    "<html lang='en'>"
-    "<head>"
-    "<meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no' />"
-    "<title>MultiGeiger Configuration</title>"
-    "<style>"
-    ".hint { display:inline-block; width:16px; height:16px; border-radius:50%; background:#ccc; color:#000; font-size:12px; line-height:16px; text-align:center; cursor:help; }"
-    "</style>"
-    "</head>"
-    "<body>"
-    "<h1>Configuration</h1>"
-    "<p>"
-    "Go to the <a href='config'>config page</a> to change settings or update firmware."
-    "</p>"
-    "<p style='font-size:smaller'>Login: user <code>admin</code>, password = AP password"
-    " <span class='hint' title='Change the AP password under &quot;Geiger accesspoint password&quot;. Default: ESP32Geiger'>?</span>"
-    "</p>"
-    "</body>"
-    "</html>\n";
-  server.send(200, "text/html;charset=UTF-8", index);
+  // Serve modern dashboard with live data
+  serveCompressed(server, dashboard_html_gz, dashboard_html_gz_len, "text/html");
 }
 
 static char lastWiFiSSID[IOTWEBCONF_WORD_LEN] = "";
@@ -668,6 +685,206 @@ void configSaved(void) {
   controller.applyDisplaySetting(showDisplay);
 }
 
+void handleGetConfig(void) {
+  String json = "{";
+
+  // WiFi settings
+  json += "\"thingName\":\"" + String(iotWebConf.getThingNameParameter()->valueBuffer) + "\",";
+  json += "\"apPassword\":\"********\",";  // Don't expose actual password
+  json += "\"wifiSsid\":\"" + String(iotWebConf.getWifiSsidParameter()->valueBuffer) + "\",";
+  json += "\"wifiPassword\":\"\",";  // Don't expose actual password
+
+  // Misc settings
+  json += "\"startSound\":" + String(playSound ? "true" : "false") + ",";
+  json += "\"speakerTick\":" + String(speakerTick ? "true" : "false") + ",";
+  json += "\"ledTick\":" + String(ledTick ? "true" : "false") + ",";
+  json += "\"showDisplay\":" + String(showDisplay ? "true" : "false") + ",";
+
+  // Transmission settings
+  json += "\"sendToCommunity\":" + String(sendToCommunity ? "true" : "false") + ",";
+  json += "\"sendToMadavi\":" + String(sendToMadavi ? "true" : "false") + ",";
+  json += "\"sendToBle\":" + String(sendToBle ? "true" : "false") + ",";
+
+  // MQTT settings
+  json += "\"sendToMqtt\":" + String(sendToMqtt ? "true" : "false") + ",";
+  json += "\"mqttHost\":\"" + String(mqttHost) + "\",";
+  json += "\"mqttPort\":" + String(mqttPort) + ",";
+  json += "\"mqttUseTls\":" + String(mqttUseTls ? "true" : "false") + ",";
+  json += "\"mqttRetain\":" + String(mqttRetain ? "true" : "false") + ",";
+  json += "\"mqttUsername\":\"" + String(mqttUsername) + "\",";
+  json += "\"mqttPassword\":\"\",";  // Don't expose actual password
+  json += "\"mqttBaseTopic\":\"" + String(mqttBaseTopic) + "\",";
+
+  // LoRa settings
+  json += "\"hasLora\":" + String(isLoraBoard ? "true" : "false") + ",";
+  if (isLoraBoard) {
+    json += "\"sendToLora\":" + String(sendToLora ? "true" : "false") + ",";
+    json += "\"deveui\":\"" + String(deveui) + "\",";
+    json += "\"appeui\":\"" + String(appeui) + "\",";
+    json += "\"appkey\":\"" + String(appkey) + "\",";
+  }
+
+  // Alarm settings
+  json += "\"soundLocalAlarm\":" + String(soundLocalAlarm ? "true" : "false") + ",";
+  json += "\"localAlarmThreshold\":" + String(localAlarmThreshold, 1) + ",";
+  json += "\"localAlarmFactor\":" + String(localAlarmFactor);
+
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+void handlePostConfig(void) {
+  if (!server.hasArg("plain")) {
+    server.send(400, "text/plain", "Body not received");
+    return;
+  }
+
+  String body = server.arg("plain");
+  log(INFO, "Received config update");
+
+  // Parse JSON manually (simple approach - ESP32 can use ArduinoJson if needed)
+  // For now, we'll use a simpler approach - just update the IotWebConf parameters
+  // and call configSaved()
+
+  // WiFi settings (only update if provided and not empty)
+  int idx;
+  idx = body.indexOf("\"thingName\":\"");
+  if (idx >= 0) {
+    int start = idx + 13;
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      if (val.length() > 0) {
+        strncpy(iotWebConf.getThingNameParameter()->valueBuffer, val.c_str(), IOTWEBCONF_WORD_LEN);
+      }
+    }
+  }
+
+  idx = body.indexOf("\"wifiSsid\":\"");
+  if (idx >= 0) {
+    int start = idx + 12;
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      strncpy(iotWebConf.getWifiSsidParameter()->valueBuffer, val.c_str(), IOTWEBCONF_WORD_LEN);
+    }
+  }
+
+  idx = body.indexOf("\"wifiPassword\":\"");
+  if (idx >= 0) {
+    int start = idx + 16;
+    int end = body.indexOf("\"", start);
+    if (end > start && end > start + 1) {  // Only update if password is provided
+      String val = body.substring(start, end);
+      if (val.length() > 0) {
+        strncpy(iotWebConf.getWifiPasswordParameter()->valueBuffer, val.c_str(), IOTWEBCONF_PASSWORD_LEN);
+      }
+    }
+  }
+
+  // Boolean settings - simple parse
+  playSound = body.indexOf("\"startSound\":true") >= 0;
+  speakerTick = body.indexOf("\"speakerTick\":true") >= 0;
+  ledTick = body.indexOf("\"ledTick\":true") >= 0;
+  showDisplay = body.indexOf("\"showDisplay\":true") >= 0;
+  sendToCommunity = body.indexOf("\"sendToCommunity\":true") >= 0;
+  sendToMadavi = body.indexOf("\"sendToMadavi\":true") >= 0;
+  sendToBle = body.indexOf("\"sendToBle\":true") >= 0;
+  sendToMqtt = body.indexOf("\"sendToMqtt\":true") >= 0;
+  mqttUseTls = body.indexOf("\"mqttUseTls\":true") >= 0;
+  mqttRetain = body.indexOf("\"mqttRetain\":true") >= 0;
+  soundLocalAlarm = body.indexOf("\"soundLocalAlarm\":true") >= 0;
+
+  if (isLoraBoard) {
+    sendToLora = body.indexOf("\"sendToLora\":true") >= 0;
+  }
+
+  // String settings
+  idx = body.indexOf("\"mqttHost\":\"");
+  if (idx >= 0) {
+    int start = idx + 12;
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      strncpy(mqttHost, val.c_str(), MQTT_HOST_LEN);
+    }
+  }
+
+  idx = body.indexOf("\"mqttUsername\":\"");
+  if (idx >= 0) {
+    int start = idx + 16;
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      strncpy(mqttUsername, val.c_str(), MQTT_USER_LEN);
+    }
+  }
+
+  idx = body.indexOf("\"mqttPassword\":\"");
+  if (idx >= 0) {
+    int start = idx + 16;
+    int end = body.indexOf("\"", start);
+    if (end > start && end > start + 1) {
+      String val = body.substring(start, end);
+      if (val.length() > 0) {
+        strncpy(mqttPassword, val.c_str(), MQTT_PASS_LEN);
+      }
+    }
+  }
+
+  idx = body.indexOf("\"mqttBaseTopic\":\"");
+  if (idx >= 0) {
+    int start = idx + 17;
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      strncpy(mqttBaseTopic, val.c_str(), MQTT_BASE_TOPIC_LEN);
+    }
+  }
+
+  // Numeric settings
+  idx = body.indexOf("\"mqttPort\":");
+  if (idx >= 0) {
+    int start = idx + 11;
+    int end = body.indexOf(",", start);
+    if (end < 0) end = body.indexOf("}", start);
+    if (end > start) {
+      mqttPort = body.substring(start, end).toInt();
+    }
+  }
+
+  idx = body.indexOf("\"localAlarmThreshold\":");
+  if (idx >= 0) {
+    int start = idx + 22;
+    int end = body.indexOf(",", start);
+    if (end < 0) end = body.indexOf("}", start);
+    if (end > start) {
+      localAlarmThreshold = body.substring(start, end).toFloat();
+    }
+  }
+
+  idx = body.indexOf("\"localAlarmFactor\":");
+  if (idx >= 0) {
+    int start = idx + 19;
+    int end = body.indexOf(",", start);
+    if (end < 0) end = body.indexOf("}", start);
+    if (end > start) {
+      localAlarmFactor = body.substring(start, end).toInt();
+    }
+  }
+
+  // Save configuration
+  iotWebConf.saveConfig();
+  configSaved();
+
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Configuration saved\"}");
+
+  // Restart device after short delay
+  delay(500);
+  ESP.restart();
+}
+
 void setup_webconf(bool loraHardware) {
   isLoraBoard = loraHardware;
   iotWebConf.setConfigSavedCallback(&configSaved);
@@ -750,12 +967,40 @@ void setup_webconf(bool loraHardware) {
 
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
+  server.on("/api/status", handleApiStatus);
+
+  // Serve dashboard assets
+  server.on("/style.css", []() {
+    serveCompressed(server, style_css_gz, style_css_gz_len, "text/css");
+  });
+  server.on("/app.js", []() {
+    serveCompressed(server, app_js_gz, app_js_gz_len, "application/javascript");
+  });
+
+  // Serve config page and assets
+  server.on("/config.html", []() {
+    serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
+  });
+  server.on("/config-style.css", []() {
+    serveCompressed(server, config_style_css_gz, config_style_css_gz_len, "text/css");
+  });
+  server.on("/config.js", []() {
+    serveCompressed(server, config_js_gz, config_js_gz_len, "application/javascript");
+  });
+
+  // Config API endpoints
+  server.on("/api/config", HTTP_GET, handleGetConfig);
+  server.on("/api/config", HTTP_POST, handlePostConfig);
+
   // Captive portal probes (Android/Windows/Apple) - redirect to config page
   server.on("/generate_204", HTTP_ANY, redirectToCaptivePortal);      // Android
   server.on("/gen_204", HTTP_ANY, redirectToCaptivePortal);           // older Android variants
   server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
   server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
-  server.on("/config", [] { iotWebConf.handleConfig(); });
+  server.on("/config", []() {
+    serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
+  });
+  server.on("/firmware", [] { iotWebConf.handleConfig(); });  // Keep IotWebConf for firmware update
   server.onNotFound([]() {
     // Quietly redirect captive-portal probes (e.g. connectivitycheck.gstatic.com) to root
     if (iotWebConf.handleCaptivePortal()) {
