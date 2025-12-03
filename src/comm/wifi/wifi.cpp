@@ -142,6 +142,11 @@ static bool isLoraBoard;
 static bool restartScheduled = false;
 static unsigned long restartTime = 0;
 
+// Config page heartbeat tracking
+static bool configPageActive = false;
+static unsigned long lastConfigPingTime = 0;
+static const unsigned long CONFIG_PING_TIMEOUT_MS = 5000;  // 5 seconds
+
 typedef struct https_client {
   WiFiClientSecure *wc;
   HTTPClient *hc;
@@ -186,6 +191,14 @@ void poll_transmission() {
     log(INFO, "Executing scheduled restart...");
     delay(100);  // Small delay to ensure log is flushed
     ESP.restart();
+  }
+
+  // Check if config page is active but no ping received for CONFIG_PING_TIMEOUT_MS
+  // If timeout, user likely left the page without saving -> re-enable ticks
+  if (configPageActive && (millis() - lastConfigPingTime) > CONFIG_PING_TIMEOUT_MS) {
+    log(INFO, "Config page heartbeat timeout - re-enabling ticks");
+    configPageActive = false;
+    tick_enable(true);
   }
 
   if (isLoraBoard) {
@@ -587,23 +600,28 @@ void handleRoot(void) {  // Handle web requests to "/" path.
     return;
   }
 
-  // looks like user wants to do some configuration or maybe flash firmware.
-  // while accessing the flash, we need to turn ticking off to avoid exceptions.
-  // user needs to save the config (or flash firmware + reboot) to turn it on again.
-  // note: it didn't look like there is an easy way to put this call at the right place
-  // (start of fw flash / start of config save) - this is why it is here.
-  tick_enable(false);
-
-  // Auto-redirect to config page in AP mode (Captive Portal behavior)
-  if (iotWebConf.getState() == iotwebconf::ApMode) {
-    log(INFO, "Captive portal: redirecting to /config");
-    server.sendHeader("Location", "/config");
-    server.send(302, "text/plain", "");
-    return;
-  }
-
-  // Serve modern dashboard with live data
+  // Serve modern dashboard with live data (read-only, no need to disable ticks)
+  // User can access dashboard even in AP mode - config is available at /config
   serveCompressed(server, dashboard_html_gz, dashboard_html_gz_len, "text/html");
+}
+
+void handleConfigPage(void) {
+  // Disable ticking while accessing the config page to avoid exceptions
+  // when accessing flash memory (firmware update or config save).
+  // Ticks will be re-enabled when config is saved (see configSaved()) or
+  // when the heartbeat timeout expires (see poll_transmission()).
+  tick_enable(false);
+  configPageActive = true;
+  lastConfigPingTime = millis();
+
+  // Serve config page
+  serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
+}
+
+void handleConfigPing(void) {
+  // Update heartbeat timestamp
+  lastConfigPingTime = millis();
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 static char lastWiFiSSID[IOTWEBCONF_WORD_LEN] = "";
@@ -690,6 +708,7 @@ void loadConfigVariables(void) {
 void configSaved(void) {
   log(INFO, "Config saved. ");
   loadConfigVariables();
+  configPageActive = false;  // Config saved, no longer on config page
   tick_enable(true);
   // Apply updated settings immediately (LED, speaker, display)
   controller.applyTickSettings(ledTick, speakerTick);
@@ -885,6 +904,60 @@ void handlePostConfig(void) {
     }
   }
 
+  // LoRa credentials (only if LoRa hardware is present)
+  if (isLoraBoard) {
+    idx = body.indexOf("\"deveui\":\"");
+    if (idx >= 0) {
+      int start = idx + 10;
+      int end = body.indexOf("\"", start);
+      if (end > start) {
+        String val = body.substring(start, end);
+        strncpy(deveui, val.c_str(), 17);
+        deveui[16] = '\0';
+      }
+    }
+
+    idx = body.indexOf("\"appeui\":\"");
+    if (idx >= 0) {
+      int start = idx + 10;
+      int end = body.indexOf("\"", start);
+      if (end > start) {
+        String val = body.substring(start, end);
+        strncpy(appeui, val.c_str(), 17);
+        appeui[16] = '\0';
+      }
+    }
+
+    idx = body.indexOf("\"appkey\":\"");
+    if (idx >= 0) {
+      int start = idx + 10;
+      int end = body.indexOf("\"", start);
+      if (end > start) {
+        String val = body.substring(start, end);
+        strncpy(appkey, val.c_str(), IOTWEBCONF_WORD_LEN);
+        appkey[IOTWEBCONF_WORD_LEN - 1] = '\0';
+      }
+    }
+  }
+
+  // Update checkbox parameter valueBuffers directly
+  // IotWebConf uses these to persist values
+  strncpy(playSound_c, playSound ? "selected" : "", CHECKBOX_LEN);
+  strncpy(speakerTick_c, speakerTick ? "selected" : "", CHECKBOX_LEN);
+  strncpy(ledTick_c, ledTick ? "selected" : "", CHECKBOX_LEN);
+  strncpy(showDisplay_c, showDisplay ? "selected" : "", CHECKBOX_LEN);
+  strncpy(sendToCommunity_c, sendToCommunity ? "selected" : "", CHECKBOX_LEN);
+  strncpy(sendToMadavi_c, sendToMadavi ? "selected" : "", CHECKBOX_LEN);
+  strncpy(sendToBle_c, sendToBle ? "selected" : "", CHECKBOX_LEN);
+  strncpy(sendToMqtt_c, sendToMqtt ? "selected" : "", CHECKBOX_LEN);
+  strncpy(mqttUseTls_c, mqttUseTls ? "selected" : "", CHECKBOX_LEN);
+  strncpy(mqttRetain_c, mqttRetain ? "selected" : "", CHECKBOX_LEN);
+  strncpy(soundLocalAlarm_c, soundLocalAlarm ? "selected" : "", CHECKBOX_LEN);
+
+  if (isLoraBoard) {
+    strncpy(sendToLora_c, sendToLora ? "selected" : "", CHECKBOX_LEN);
+  }
+
   // Save configuration
   iotWebConf.saveConfig();
   configSaved();
@@ -992,9 +1065,7 @@ void setup_webconf(bool loraHardware) {
   });
 
   // Serve config page and assets
-  server.on("/config.html", []() {
-    serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
-  });
+  server.on("/config.html", handleConfigPage);
   server.on("/config-style.css", []() {
     serveCompressed(server, config_style_css_gz, config_style_css_gz_len, "text/css");
   });
@@ -1005,15 +1076,14 @@ void setup_webconf(bool loraHardware) {
   // Config API endpoints
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
+  server.on("/api/config/ping", HTTP_POST, handleConfigPing);
 
   // Captive portal probes (Android/Windows/Apple) - redirect to config page
   server.on("/generate_204", HTTP_ANY, redirectToCaptivePortal);      // Android
   server.on("/gen_204", HTTP_ANY, redirectToCaptivePortal);           // older Android variants
   server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
   server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
-  server.on("/config", []() {
-    serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
-  });
+  server.on("/config", handleConfigPage);
   server.on("/firmware", [] { iotWebConf.handleConfig(); });  // Keep IotWebConf for firmware update
   server.onNotFound([]() {
     // Quietly redirect captive-portal probes (e.g. connectivitycheck.gstatic.com) to root

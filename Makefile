@@ -9,7 +9,7 @@ WEB_ASSETS ?= src/comm/wifi/web_assets.h
 
 .PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web
 
-web: build-web
+all: build
 
 build-web:
 	@echo "Building web frontend..."

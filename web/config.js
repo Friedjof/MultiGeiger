@@ -17,6 +17,7 @@ class ConfigManager {
         this.statusMessage = document.getElementById('status-message');
         this.resetBtn = document.getElementById('reset-btn');
         this.originalConfig = null;
+        this.heartbeatInterval = null;
 
         this.init();
     }
@@ -36,6 +37,31 @@ class ConfigManager {
 
         // Load device info
         this.loadDeviceInfo();
+
+        // Start heartbeat to keep ticks disabled while on config page
+        this.startHeartbeat();
+
+        // Stop heartbeat when leaving page
+        window.addEventListener('beforeunload', () => this.stopHeartbeat());
+    }
+
+    startHeartbeat() {
+        // Send heartbeat every 2 seconds to keep ticks disabled
+        if (!USE_MOCK_API) {
+            this.heartbeatInterval = setInterval(() => {
+                fetch('/api/config/ping', { method: 'POST' })
+                    .catch(err => console.warn('Heartbeat failed:', err));
+            }, 2000);
+            console.log('Config page heartbeat started');
+        }
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+            console.log('Config page heartbeat stopped');
+        }
     }
 
     initAccordion() {
@@ -230,6 +256,9 @@ class ConfigManager {
             this.showStatus('Please fill in all required fields', 'error');
             return;
         }
+
+        // Stop heartbeat - config is being saved
+        this.stopHeartbeat();
 
         const formData = this.getFormData();
 

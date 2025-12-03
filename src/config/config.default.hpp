@@ -101,7 +101,7 @@
 #define SENSORCOMMUNITY_URL "http://api.sensor.community/v1/push-sensor-data/"
 #define CUSTOMSRV_URL "https://ptsv2.com/t/xxxxx-yyyyyyyyyy/post"
 #define SEND2CUSTOMSRV false
-#define CONFIG_VERSION "016"
+#define CONFIG_VERSION "017"
 
 // Web config checkboxes have 'selected' if checked, so we need 9 byte for this string.
 #define CHECKBOX_LEN 9
