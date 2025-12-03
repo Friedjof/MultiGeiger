@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>MultiGeiger - Settings</title>
+    <link rel="stylesheet" href="config-style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header-card">
+            <h1>
+                <span class="icon">⚙️</span>
+                Settings
+            </h1>
+            <a href="/" class="back-btn">
+                <span>←</span>
+                <span>Back</span>
+            </a>
+        </div>
+
+        <!-- Status Message -->
+        <div id="status-message" class="status-message hidden"></div>
+
+        <form id="config-form">
+            <!-- WiFi Settings -->
+            <div class="config-section accordion">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">📡</span>
+                    <h2>WiFi</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="form-group">
+                    <label for="thingName">Access Point Name</label>
+                    <input type="text" id="thingName" name="thingName" required>
+                    <span class="help-text">Name of the MultiGeiger hotspot</span>
+                </div>
+                <div class="form-group">
+                    <label for="apPassword">Access Point Password</label>
+                    <input type="password" id="apPassword" name="apPassword" required minlength="8">
+                    <span class="help-text">At least 8 characters</span>
+                </div>
+                <div class="form-group">
+                    <label for="wifiSsid">WiFi Client SSID</label>
+                    <input type="text" id="wifiSsid" name="wifiSsid">
+                    <span class="help-text">Connect to this network</span>
+                </div>
+                <div class="form-group">
+                    <label for="wifiPassword">WiFi Client Password</label>
+                    <input type="password" id="wifiPassword" name="wifiPassword">
+                </div>
+                </div>
+            </div>
+
+            <!-- Misc Settings -->
+            <div class="config-section accordion">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">🔧</span>
+                    <h2>Miscellaneous</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="startSound" name="startSound">
+                        <span class="checkbox-custom"></span>
+                        <span>Start Sound</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="speakerTick" name="speakerTick">
+                        <span class="checkbox-custom"></span>
+                        <span>Speaker Tick</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="ledTick" name="ledTick">
+                        <span class="checkbox-custom"></span>
+                        <span>LED Tick</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showDisplay" name="showDisplay">
+                        <span class="checkbox-custom"></span>
+                        <span>Show Display</span>
+                    </label>
+                </div>
+                </div>
+            </div>
+
+            <!-- Transmission Settings -->
+            <div class="config-section accordion">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">📤</span>
+                    <h2>Data Transmission</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="sendToCommunity" name="sendToCommunity">
+                        <span class="checkbox-custom"></span>
+                        <span>Send to sensor.community</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="sendToMadavi" name="sendToMadavi">
+                        <span class="checkbox-custom"></span>
+                        <span>Send to madavi.de</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="sendToBle" name="sendToBle">
+                        <span class="checkbox-custom"></span>
+                        <span>Send via BLE (restart required!)</span>
+                    </label>
+                </div>
+                </div>
+            </div>
+
+            <!-- MQTT Settings -->
+            <div class="config-section accordion">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">💬</span>
+                    <h2>MQTT</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="sendToMqtt" name="sendToMqtt">
+                        <span class="checkbox-custom"></span>
+                        <span>Enable MQTT</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="mqttHost">MQTT Broker</label>
+                    <input type="text" id="mqttHost" name="mqttHost" placeholder="mqtt.example.com">
+                </div>
+                <div class="form-group">
+                    <label for="mqttPort">MQTT Port</label>
+                    <input type="number" id="mqttPort" name="mqttPort" min="1" max="65535" placeholder="1883">
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mqttUseTls" name="mqttUseTls">
+                        <span class="checkbox-custom"></span>
+                        <span>Use TLS (insecure PoC)</span>
+                    </label>
+                </div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mqttRetain" name="mqttRetain">
+                        <span class="checkbox-custom"></span>
+                        <span>Retain MQTT messages</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="mqttUsername">Username</label>
+                    <input type="text" id="mqttUsername" name="mqttUsername" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="mqttPassword">Password</label>
+                    <input type="password" id="mqttPassword" name="mqttPassword" autocomplete="current-password">
+                </div>
+                <div class="form-group">
+                    <label for="mqttBaseTopic">Base Topic (optional)</label>
+                    <input type="text" id="mqttBaseTopic" name="mqttBaseTopic" placeholder="multigeiger">
+                </div>
+                </div>
+            </div>
+
+            <!-- LoRa Settings (shown only if hardware supports it) -->
+            <div id="lora-section" class="config-section accordion hidden">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">📡</span>
+                    <h2>LoRa / TTN</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="sendToLora" name="sendToLora">
+                        <span class="checkbox-custom"></span>
+                        <span>Send to LoRa/TTN</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="deveui">DEVEUI</label>
+                    <input type="text" id="deveui" name="deveui" maxlength="16" pattern="[0-9A-Fa-f]{16}">
+                    <span class="help-text">16 hexadecimal characters</span>
+                </div>
+                <div class="form-group">
+                    <label for="appeui">APPEUI</label>
+                    <input type="text" id="appeui" name="appeui" maxlength="16" pattern="[0-9A-Fa-f]{16}">
+                    <span class="help-text">16 hexadecimal characters</span>
+                </div>
+                <div class="form-group">
+                    <label for="appkey">APPKEY</label>
+                    <input type="text" id="appkey" name="appkey" maxlength="32" pattern="[0-9A-Fa-f]{32}">
+                    <span class="help-text">32 hexadecimal characters</span>
+                </div>
+                </div>
+            </div>
+
+            <!-- Alarm Settings -->
+            <div class="config-section accordion">
+                <div class="section-header accordion-header">
+                    <span class="section-icon">🔔</span>
+                    <h2>Local Alarm</h2>
+                    <span class="accordion-chevron">▼</span>
+                </div>
+                <div class="section-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="soundLocalAlarm" name="soundLocalAlarm">
+                        <span class="checkbox-custom"></span>
+                        <span>Enable Local Alarm</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="localAlarmThreshold">Alarm Threshold (µSv/h)</label>
+                    <input type="number" id="localAlarmThreshold" name="localAlarmThreshold"
+                           step="0.1" min="0" placeholder="0.5">
+                </div>
+                <div class="form-group">
+                    <label for="localAlarmFactor">Alarm Factor</label>
+                    <input type="number" id="localAlarmFactor" name="localAlarmFactor"
+                           min="1" placeholder="10">
+                    <span class="help-text">Multiple of normal value</span>
+                </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-icon">💾</span>
+                    <span>Save</span>
+                </button>
+                <button type="button" id="reset-btn" class="btn btn-secondary">
+                    <span class="btn-icon">↻</span>
+                    <span>Reset</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- Firmware Update Section -->
+        <div class="config-section accordion">
+            <div class="section-header accordion-header">
+                <span class="section-icon">⬆️</span>
+                <h2>Firmware Update</h2>
+                <span class="accordion-chevron">▼</span>
+            </div>
+            <div class="section-content">
+            <div class="update-info">
+                <p>Current Version: <strong id="current-version">Loading...</strong></p>
+                <a href="/firmware" class="btn btn-secondary">
+                    <span class="btn-icon">📦</span>
+                    <span>Update Firmware</span>
+                </a>
+            </div>
+            </div>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="footer-info">
+            <p>MultiGeiger Configuration</p>
+            <p class="small-text">Device will restart after saving</p>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+</body>
+</html>

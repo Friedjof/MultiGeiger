@@ -2,12 +2,20 @@ PIO ?= pio
 ENV ?= geiger
 UV ?= uv
 VENV ?= .venv
+PYTHON ?= python3
 SPHINXBUILD ?= $(CURDIR)/$(VENV)/bin/sphinx-build
 DOCS_STAMP ?= $(VENV)/.docs-installed
+WEB_ASSETS ?= src/comm/wifi/web_assets.h
 
-.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase
+.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web
 
-build:
+web: build-web
+
+build-web:
+	@echo "Building web frontend..."
+	@$(PYTHON) tools/embed_web.py
+
+build: build-web
 	@$(PIO) run -e $(ENV)
 
 flash:
@@ -21,6 +29,7 @@ run: flash
 
 clean:
 	@$(PIO) run -t clean -e $(ENV)
+	@rm -f $(WEB_ASSETS)
 
 setup:
 	@test -f src/config/config.hpp || cp src/config/config.default.hpp src/config/config.hpp

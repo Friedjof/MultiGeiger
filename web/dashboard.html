@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>MultiGeiger</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Hero: Main value Dose Rate -->
+        <div class="hero-card">
+            <div class="hero-header">
+                <div class="device-name">
+                    <span class="icon">☢️</span>
+                    <span>MultiGeiger</span>
+                </div>
+                <div class="status-indicator">
+                    <span id="update-dot" class="pulse-dot"></span>
+                    <span id="connection-status" class="status-text">Online</span>
+                </div>
+            </div>
+
+            <div class="hero-value">
+                <div class="dose-display">
+                    <span id="dose-rate" class="dose-number">--</span>
+                    <span class="dose-unit">µSv/h</span>
+                </div>
+                <div class="dose-label">Dose Rate</div>
+            </div>
+
+            <div id="hv-error" class="hero-alert hidden">
+                <span class="alert-icon">⚠️</span>
+                <span>High voltage error detected</span>
+            </div>
+        </div>
+
+        <!-- Secondary radiation values -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Counts/Min</div>
+                <div class="stat-value" id="cpm">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="counts">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Uptime</div>
+                <div class="stat-value" id="uptime">--</div>
+            </div>
+        </div>
+
+        <!-- Environmental data (optional, compact) -->
+        <div class="env-section" id="env-section">
+            <div class="section-title">Environment</div>
+            <div class="env-grid">
+                <div class="env-item">
+                    <span class="env-icon">🌡️</span>
+                    <span class="env-value" id="temperature">--</span>
+                    <span class="env-unit">°C</span>
+                </div>
+                <div class="env-item">
+                    <span class="env-icon">💧</span>
+                    <span class="env-value" id="humidity">--</span>
+                    <span class="env-unit">%</span>
+                </div>
+                <div class="env-item">
+                    <span class="env-icon">🌪️</span>
+                    <span class="env-value" id="pressure">--</span>
+                    <span class="env-unit">hPa</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <a href="/config.html" class="footer-btn">
+                <span class="btn-icon">⚙️</span>
+                <span>Settings</span>
+            </a>
+            <div class="footer-info">
+                <span id="last-update" class="update-text">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Ignore generated/temporary files
+*.pyc
+__pycache__/
+.DS_Store

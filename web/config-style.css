@@ -1,0 +1,527 @@
+/* MultiGeiger Config Page CSS - Mobile First */
+
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-card: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border: #475569;
+    --input-bg: #1e293b;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1f35 100%);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding-bottom: 40px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Header */
+.header-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 4px 8px var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.header-card h1 {
+    font-size: 1.5em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon {
+    font-size: 1.2em;
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(37, 99, 235, 0.15);
+    color: #60a5fa;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: all 0.2s;
+    min-height: 44px;
+}
+
+.back-btn:hover {
+    background: rgba(37, 99, 235, 0.25);
+}
+
+/* Status Message */
+.status-message {
+    padding: 16px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    text-align: center;
+    animation: slideDown 0.3s ease;
+}
+
+.status-message.success {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid var(--success);
+    color: #6ee7b7;
+}
+
+.status-message.error {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--danger);
+    color: #fca5a5;
+}
+
+.status-message.hidden {
+    display: none;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Config Sections */
+.config-section {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 2px 4px var(--shadow);
+    border: 1px solid var(--border);
+}
+
+.accordion.config-section {
+    padding: 0;
+    border-radius: 0;
+    margin-top: -1px;
+}
+
+/* First accordion in form gets top radius */
+form .accordion.config-section:first-child {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top: 0;
+}
+
+/* Last visible accordion in form gets bottom radius */
+form .accordion.config-section.last-visible {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg) !important;
+}
+
+/* Firmware section (outside form) gets all corners rounded */
+form ~ .accordion.config-section {
+    border-radius: var(--radius-lg);
+    margin-top: 0;
+}
+
+.config-section.hidden {
+    display: none;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.accordion .section-header {
+    margin-bottom: 0;
+    padding: 16px 20px;
+    border-bottom: none;
+    border-radius: 0;
+}
+
+.accordion.active .section-header {
+    border-bottom: 1px solid var(--border);
+}
+
+/* First accordion in form - header gets top radius */
+form .accordion.config-section:first-child .section-header {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Last visible accordion in form - header gets bottom radius when closed */
+form .accordion.config-section.last-visible:not(.active) .section-header {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Last visible accordion in form - content area gets bottom radius when open */
+form .accordion.config-section.last-visible.active .section-content {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Firmware section (outside form) - header gets all corners */
+form ~ .accordion.config-section .section-header {
+    border-radius: var(--radius-lg);
+}
+
+form ~ .accordion.config-section.active .section-header {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.section-icon {
+    font-size: 1.3em;
+}
+
+.section-header h2 {
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: var(--text-primary);
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 1em;
+    transition: all 0.2s;
+    min-height: 44px;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-group input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.help-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+}
+
+/* Checkbox Groups */
+.checkbox-group {
+    margin-bottom: 16px;
+}
+
+.checkbox-group:last-child {
+    margin-bottom: 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+    min-height: 44px;
+}
+
+.checkbox-label:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.checkbox-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkbox-custom {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.9em;
+    font-weight: 700;
+}
+
+.checkbox-label input[type="checkbox"]:focus ~ .checkbox-custom {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.checkbox-label span:last-child {
+    font-size: 0.95em;
+    font-weight: 500;
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    min-height: 48px;
+    flex: 1;
+    min-width: 140px;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    text-decoration: none;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-icon {
+    font-size: 1.2em;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Update Info */
+.update-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.update-info p {
+    font-size: 0.95em;
+}
+
+.update-info strong {
+    color: var(--primary);
+}
+
+/* Footer Info */
+.footer-info {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+}
+
+.footer-info p {
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+
+.small-text {
+    font-size: 0.8em !important;
+    opacity: 0.8;
+}
+
+/* Accordion Styles */
+.accordion-header {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.accordion-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.accordion-chevron {
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+    opacity: 0.7;
+}
+
+.accordion.active .accordion-chevron {
+    transform: rotate(-180deg);
+}
+
+.section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+}
+
+.accordion.active .section-content {
+    max-height: 2000px;
+    opacity: 1;
+    padding: 0 20px 20px 20px;
+}
+
+/* Ensure first accordion is open by default */
+.accordion:first-of-type {
+    /* This class will be added via JavaScript */
+}
+
+/* Responsive - Tablet */
+@media (min-width: 600px) {
+    .container {
+        padding: 24px;
+        gap: 24px;
+    }
+
+    .header-card {
+        padding: 24px;
+    }
+
+    .header-card h1 {
+        font-size: 1.8em;
+    }
+
+    .config-section {
+        padding: 24px;
+    }
+
+    .section-header h2 {
+        font-size: 1.3em;
+    }
+
+    .button-group {
+        gap: 16px;
+    }
+}
+
+/* Responsive - Desktop */
+@media (min-width: 900px) {
+    .container {
+        max-width: 1000px;
+        padding: 32px;
+    }
+
+    .button-group .btn {
+        flex: 0 1 auto;
+        min-width: 160px;
+    }
+}
+
+/* Loading State */
+form.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Smooth Transitions */
+input, .checkbox-custom, .btn {
+    transition: all 0.2s ease;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
