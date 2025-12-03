@@ -138,6 +138,10 @@ static unsigned int lora_software_version;
 static String chipID;
 static bool isLoraBoard;
 
+// Flags for scheduled restart (prevents ESP crash on config save)
+static bool restartScheduled = false;
+static unsigned long restartTime = 0;
+
 typedef struct https_client {
   WiFiClientSecure *wc;
   HTTPClient *hc;
@@ -177,6 +181,13 @@ void setup_transmission(const char *version, char *ssid, bool loraHardware) {
 }
 
 void poll_transmission() {
+  // Check for scheduled restart
+  if (restartScheduled && millis() >= restartTime) {
+    log(INFO, "Executing scheduled restart...");
+    delay(100);  // Small delay to ensure log is flushed
+    ESP.restart();
+  }
+
   if (isLoraBoard) {
     // The LMIC needs to be polled a lot; and this is very low cost if the LMIC isn't
     // active. So we just act as a bridge. We need this routine so we can see
@@ -878,11 +889,14 @@ void handlePostConfig(void) {
   iotWebConf.saveConfig();
   configSaved();
 
+  // Send success response
   server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Configuration saved\"}");
 
-  // Restart device after short delay
-  delay(500);
-  ESP.restart();
+  // Schedule restart after TCP connection is properly closed
+  // This prevents crashes due to incomplete HTTP response transmission
+  restartScheduled = true;
+  restartTime = millis() + 2000;  // Restart in 2 seconds
+  log(INFO, "Restart scheduled in 2 seconds...");
 }
 
 void setup_webconf(bool loraHardware) {
