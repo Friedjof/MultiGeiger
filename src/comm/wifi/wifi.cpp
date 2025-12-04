@@ -411,16 +411,31 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     display_status();
   }
 
-  if(isLoraBoard && sendToLora && (strcmp(appeui, "") != 0)) {    // send only, if we have LoRa credentials
+  if(isLoraBoard && sendToLora && (strcmp(devaddr, "") != 0)) {    // send only, if we have ABP credentials
     bool ttn_ok;
     log(INFO, "Sending to TTN ...");
+    log(INFO, "  - isLoraBoard: %d, sendToLora: %d, devaddr: %s", isLoraBoard, sendToLora, devaddr);
     set_status(STATUS_TTN, ST_TTN_SENDING);
     display_status();
     rc1 = send_ttn_geiger(tube_nbr, dt, gm_counts);
+    log(INFO, "TTN send_ttn_geiger result: %d", rc1);
     rc2 = have_thp ? send_ttn_thp(temperature, humidity, pressure) : TX_STATUS_UPLINK_SUCCESS;
+    if (have_thp) {
+      log(INFO, "TTN send_ttn_thp result: %d", rc2);
+    }
     ttn_ok = (rc1 == TX_STATUS_UPLINK_SUCCESS) && (rc2 == TX_STATUS_UPLINK_SUCCESS);
+    log(INFO, "TTN transmission %s (rc1=%d, rc2=%d)", ttn_ok ? "SUCCESS" : "FAILED", rc1, rc2);
     set_status(STATUS_TTN, ttn_ok ? ST_TTN_IDLE : ST_TTN_ERROR);
     display_status();
+  } else {
+    // Log why LoRa is not sending
+    if (!isLoraBoard) {
+      log(INFO, "NOT sending to TTN: LoRa hardware not detected");
+    } else if (!sendToLora) {
+      log(INFO, "NOT sending to TTN: 'Send to LoRa' disabled in config");
+    } else if (strcmp(devaddr, "") == 0) {
+      log(INFO, "NOT sending to TTN: DevAddr is empty (ABP not configured)");
+    }
   }
 }
 
@@ -468,9 +483,10 @@ char sendToMqtt_c[CHECKBOX_LEN];
 char mqttUseTls_c[CHECKBOX_LEN];
 char mqttRetain_c[CHECKBOX_LEN];
 
-char appeui[17] = "";
-char deveui[17] = "";
-char appkey[IOTWEBCONF_WORD_LEN] = "";
+// ABP LoRaWAN credentials (instead of OTAA)
+char devaddr[IOTWEBCONF_WORD_LEN] = "";  // Device Address (8 hex chars, e.g., "26011D01")
+char nwkskey[IOTWEBCONF_WORD_LEN] = "";  // Network Session Key (32 hex chars)
+char appskey[IOTWEBCONF_WORD_LEN] = "";  // Application Session Key (32 hex chars)
 
 float localAlarmThreshold = LOCAL_ALARM_THRESHOLD;
 int localAlarmFactor = (int)LOCAL_ALARM_FACTOR;
@@ -488,9 +504,9 @@ iotwebconf::CheckboxParameter sendToBleParam = iotwebconf::CheckboxParameter("Se
 
 iotwebconf::ParameterGroup grpLoRa = iotwebconf::ParameterGroup("lora", "LoRa Settings");
 iotwebconf::CheckboxParameter sendToLoraParam = iotwebconf::CheckboxParameter("Send to LoRa (=>TTN)", "send2lora", sendToLora_c, CHECKBOX_LEN, sendToLora);
-iotwebconf::TextParameter deveuiParam = iotwebconf::TextParameter("DEVEUI", "deveui", deveui, 17);
-iotwebconf::TextParameter appeuiParam = iotwebconf::TextParameter("APPEUI", "appeui", appeui, 17);
-iotwebconf::TextParameter appkeyParam = iotwebconf::TextParameter("APPKEY", "appkey", appkey, 33);
+iotwebconf::TextParameter devaddrParam = iotwebconf::TextParameter("DevAddr (ABP)", "devaddr", devaddr, IOTWEBCONF_WORD_LEN);
+iotwebconf::TextParameter nwkskeyParam = iotwebconf::TextParameter("NwkSKey (ABP)", "nwkskey", nwkskey, IOTWEBCONF_WORD_LEN);
+iotwebconf::TextParameter appskeyParam = iotwebconf::TextParameter("AppSKey (ABP)", "appskey", appskey, IOTWEBCONF_WORD_LEN);
 
 iotwebconf::ParameterGroup grpMqtt = iotwebconf::ParameterGroup("mqtt", "MQTT Settings");
 iotwebconf::CheckboxParameter sendToMqttParam = iotwebconf::CheckboxParameter("Send to MQTT", "send2mqtt", sendToMqtt_c, CHECKBOX_LEN, sendToMqtt);
@@ -749,9 +765,9 @@ void handleGetConfig(void) {
   json += "\"hasLora\":" + String(isLoraBoard ? "true" : "false") + ",";
   if (isLoraBoard) {
     json += "\"sendToLora\":" + String(sendToLora ? "true" : "false") + ",";
-    json += "\"deveui\":\"" + String(deveui) + "\",";
-    json += "\"appeui\":\"" + String(appeui) + "\",";
-    json += "\"appkey\":\"" + String(appkey) + "\",";
+    json += "\"devaddr\":\"" + String(devaddr) + "\",";
+    json += "\"nwkskey\":\"" + String(nwkskey) + "\",";
+    json += "\"appskey\":\"" + String(appskey) + "\",";
   }
 
   // Alarm settings
@@ -904,38 +920,38 @@ void handlePostConfig(void) {
     }
   }
 
-  // LoRa credentials (only if LoRa hardware is present)
+  // ABP LoRa credentials (only if LoRa hardware is present)
   if (isLoraBoard) {
-    idx = body.indexOf("\"deveui\":\"");
+    idx = body.indexOf("\"devaddr\":\"");
     if (idx >= 0) {
-      int start = idx + 10;
+      int start = idx + 11;
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(deveui, val.c_str(), 17);
-        deveui[16] = '\0';
+        strncpy(devaddr, val.c_str(), IOTWEBCONF_WORD_LEN);
+        devaddr[IOTWEBCONF_WORD_LEN - 1] = '\0';
       }
     }
 
-    idx = body.indexOf("\"appeui\":\"");
+    idx = body.indexOf("\"nwkskey\":\"");
     if (idx >= 0) {
-      int start = idx + 10;
+      int start = idx + 11;
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(appeui, val.c_str(), 17);
-        appeui[16] = '\0';
+        strncpy(nwkskey, val.c_str(), IOTWEBCONF_WORD_LEN);
+        nwkskey[IOTWEBCONF_WORD_LEN - 1] = '\0';
       }
     }
 
-    idx = body.indexOf("\"appkey\":\"");
+    idx = body.indexOf("\"appskey\":\"");
     if (idx >= 0) {
-      int start = idx + 10;
+      int start = idx + 11;
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(appkey, val.c_str(), IOTWEBCONF_WORD_LEN);
-        appkey[IOTWEBCONF_WORD_LEN - 1] = '\0';
+        strncpy(appskey, val.c_str(), IOTWEBCONF_WORD_LEN);
+        appskey[IOTWEBCONF_WORD_LEN - 1] = '\0';
       }
     }
   }
@@ -1007,9 +1023,9 @@ void setup_webconf(bool loraHardware) {
   iotWebConf.addParameterGroup(&grpMqtt);
   if (isLoraBoard) {
     grpLoRa.addItem(&sendToLoraParam);
-    grpLoRa.addItem(&deveuiParam);
-    grpLoRa.addItem(&appeuiParam);
-    grpLoRa.addItem(&appkeyParam);
+    grpLoRa.addItem(&devaddrParam);
+    grpLoRa.addItem(&nwkskeyParam);
+    grpLoRa.addItem(&appskeyParam);
     iotWebConf.addParameterGroup(&grpLoRa);
   }
   grpAlarm.addItem(&soundLocalAlarmParam);

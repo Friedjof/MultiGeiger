@@ -37,9 +37,10 @@ extern char mqttUsername[];
 extern char mqttPassword[];
 extern char mqttBaseTopic[];
 
-extern char appeui[];
-extern char deveui[];
-extern char appkey[];
+// ABP LoRaWAN credentials
+extern char devaddr[];
+extern char nwkskey[];
+extern char appskey[];
 
 extern float localAlarmThreshold;
 extern int localAlarmFactor;

@@ -18,7 +18,7 @@ build-web:
 build: build-web
 	@$(PIO) run -e $(ENV)
 
-flash:
+flash: build
 	@$(PIO) run -t upload -e $(ENV)
 
 monitor:

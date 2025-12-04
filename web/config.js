@@ -174,9 +174,9 @@ class ConfigManager {
         if (config.hasLora) {
             document.getElementById('lora-section').classList.remove('hidden');
             this.setCheckbox('sendToLora', config.sendToLora);
-            this.setFieldValue('deveui', config.deveui);
-            this.setFieldValue('appeui', config.appeui);
-            this.setFieldValue('appkey', config.appkey);
+            this.setFieldValue('devaddr', config.devaddr);
+            this.setFieldValue('nwkskey', config.nwkskey);
+            this.setFieldValue('appskey', config.appskey);
             // Update last visible accordion after showing LoRa section
             this.updateLastVisibleAccordion();
         }
@@ -240,9 +240,9 @@ class ConfigManager {
         const loraSection = document.getElementById('lora-section');
         if (!loraSection.classList.contains('hidden')) {
             data.sendToLora = document.getElementById('sendToLora').checked;
-            data.deveui = document.getElementById('deveui').value;
-            data.appeui = document.getElementById('appeui').value;
-            data.appkey = document.getElementById('appkey').value;
+            data.devaddr = document.getElementById('devaddr').value;
+            data.nwkskey = document.getElementById('nwkskey').value;
+            data.appskey = document.getElementById('appskey').value;
         }
 
         return data;

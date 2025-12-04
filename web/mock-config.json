@@ -20,9 +20,9 @@
   "mqttBaseTopic": "multigeiger",
   "hasLora": false,
   "sendToLora": false,
-  "deveui": "",
-  "appeui": "",
-  "appkey": "",
+  "devaddr": "",
+  "nwkskey": "",
+  "appskey": "",
   "soundLocalAlarm": false,
   "localAlarmThreshold": 0.5,
   "localAlarmFactor": 10

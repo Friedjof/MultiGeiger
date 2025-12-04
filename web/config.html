@@ -200,19 +200,19 @@
                     </label>
                 </div>
                 <div class="form-group">
-                    <label for="deveui">DEVEUI</label>
-                    <input type="text" id="deveui" name="deveui" maxlength="16" pattern="[0-9A-Fa-f]{16}">
-                    <span class="help-text">16 hexadecimal characters</span>
+                    <label for="devaddr">DevAddr (ABP)</label>
+                    <input type="text" id="devaddr" name="devaddr" maxlength="8" pattern="[0-9A-Fa-f]{8}">
+                    <span class="help-text">8 hexadecimal characters (e.g., 26011D01)</span>
                 </div>
                 <div class="form-group">
-                    <label for="appeui">APPEUI</label>
-                    <input type="text" id="appeui" name="appeui" maxlength="16" pattern="[0-9A-Fa-f]{16}">
-                    <span class="help-text">16 hexadecimal characters</span>
+                    <label for="nwkskey">NwkSKey (ABP)</label>
+                    <input type="text" id="nwkskey" name="nwkskey" maxlength="32" pattern="[0-9A-Fa-f]{32}">
+                    <span class="help-text">32 hexadecimal characters (Network Session Key)</span>
                 </div>
                 <div class="form-group">
-                    <label for="appkey">APPKEY</label>
-                    <input type="text" id="appkey" name="appkey" maxlength="32" pattern="[0-9A-Fa-f]{32}">
-                    <span class="help-text">32 hexadecimal characters</span>
+                    <label for="appskey">AppSKey (ABP)</label>
+                    <input type="text" id="appskey" name="appskey" maxlength="32" pattern="[0-9A-Fa-f]{32}">
+                    <span class="help-text">32 hexadecimal characters (Application Session Key)</span>
                 </div>
                 </div>
             </div>

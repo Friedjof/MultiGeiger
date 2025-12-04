@@ -8,9 +8,10 @@
 #include "drivers/hal/heltecv2.hpp"
 #include "core/core.hpp"
 
-extern char appeui[];
-extern char deveui[];
-extern char appkey[];
+// ABP credentials
+extern char devaddr[];
+extern char nwkskey[];
+extern char appskey[];
 
 typedef enum {
   TX_STATUS_UNKNOWN = 0,

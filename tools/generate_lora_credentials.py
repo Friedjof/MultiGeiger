@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate LoRaWAN credentials (DEVEUI, APPEUI, APPKEY) for MultiGeiger.
+Generate LoRaWAN ABP credentials (DevAddr, NwkSKey, AppSKey) for MultiGeiger.
+
+ABP (Activation By Personalization) is required for single-channel gateways
+like Dragino LG01-N which cannot handle OTAA downlinks reliably.
 
 WARNING: It's recommended to let The Things Network (TTN) generate these
 credentials to ensure uniqueness and security. Use this script only if you
@@ -8,7 +11,7 @@ understand the implications.
 
 Usage:
     python generate_lora_credentials.py
-    python generate_lora_credentials.py --deveui-from-mac AA:BB:CC:DD:EE:FF
+    python generate_lora_credentials.py --devaddr 26011D01
 """
 
 import argparse
@@ -16,63 +19,42 @@ import secrets
 import sys
 
 
-def generate_deveui_from_mac(mac_address: str) -> str:
+def generate_devaddr() -> str:
     """
-    Generate DEVEUI from MAC address.
+    Generate a random DevAddr (Device Address) for ABP.
 
-    Format: Converts MAC (6 bytes) to EUI-64 (8 bytes) by inserting FFFE in the middle.
-    Example: AA:BB:CC:DD:EE:FF -> AABBCCFFFEFDDEEFF
-
-    Args:
-        mac_address: MAC address in format AA:BB:CC:DD:EE:FF
+    DevAddr format: 4 bytes (8 hex chars)
+    For TTN, use prefix 0x26 or 0x27 (TTN address space)
 
     Returns:
-        DEVEUI as 16-character hex string (no spaces)
+        DevAddr as 8-character hex string
     """
-    # Remove colons and convert to uppercase
-    mac = mac_address.replace(":", "").replace("-", "").upper()
-
-    if len(mac) != 12:
-        raise ValueError(f"Invalid MAC address: {mac_address}")
-
-    # EUI-64: Insert FFFE in the middle of MAC
-    # AA BB CC DD EE FF -> AA BB CC FF FE DD EE FF
-    deveui = mac[:6] + "FFFE" + mac[6:]
-
-    return deveui
+    # Generate random 3 bytes and prepend 0x26 for TTN
+    random_bytes = secrets.token_bytes(3)
+    devaddr = "26" + random_bytes.hex().upper()
+    return devaddr
 
 
-def generate_random_deveui() -> str:
+def generate_nwkskey() -> str:
     """
-    Generate a random DEVEUI (8 bytes = 16 hex chars).
+    Generate a cryptographically secure random Network Session Key (NwkSKey).
 
-    WARNING: This may collide with existing devices!
+    NwkSKey format: 16 bytes (32 hex chars)
 
     Returns:
-        DEVEUI as 16-character hex string
+        NwkSKey as 32-character hex string
     """
-    return secrets.token_hex(8).upper()
+    return secrets.token_hex(16).upper()
 
 
-def generate_appeui() -> str:
+def generate_appskey() -> str:
     """
-    Generate APPEUI (JoinEUI).
+    Generate a cryptographically secure random Application Session Key (AppSKey).
 
-    For private applications, it's common to use all zeros.
-    TTN v3 allows this.
+    AppSKey format: 16 bytes (32 hex chars)
 
     Returns:
-        APPEUI as 16-character hex string (all zeros)
-    """
-    return "0000000000000000"
-
-
-def generate_appkey() -> str:
-    """
-    Generate a cryptographically secure random APPKEY (16 bytes = 32 hex chars).
-
-    Returns:
-        APPKEY as 32-character hex string
+        AppSKey as 32-character hex string
     """
     return secrets.token_hex(16).upper()
 
@@ -88,90 +70,90 @@ def format_with_spaces(hex_string: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate LoRaWAN credentials for MultiGeiger",
+        description="Generate LoRaWAN ABP credentials for MultiGeiger",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Generate random credentials
+  # Generate random ABP credentials
   python generate_lora_credentials.py
 
-  # Generate DEVEUI from ESP32 MAC address
-  python generate_lora_credentials.py --deveui-from-mac AA:BB:CC:DD:EE:FF
+  # Use specific DevAddr
+  python generate_lora_credentials.py --devaddr 26011D01
 
-WARNING: It's strongly recommended to let TTN generate these credentials!
+WARNING: It's strongly recommended to let TTN generate ABP credentials!
+ABP is required for single-channel gateways like Dragino LG01-N.
         """
     )
 
     parser.add_argument(
-        "--deveui-from-mac",
-        metavar="MAC",
-        help="Generate DEVEUI from MAC address (format: AA:BB:CC:DD:EE:FF)"
-    )
-
-    parser.add_argument(
-        "--random-deveui",
-        action="store_true",
-        help="Generate completely random DEVEUI (WARNING: collision risk!)"
+        "--devaddr",
+        metavar="ADDR",
+        help="Use specific DevAddr (format: 26011D01, must start with 0x26 or 0x27 for TTN)"
     )
 
     args = parser.parse_args()
 
     print("=" * 70)
-    print("LoRaWAN Credentials Generator for MultiGeiger")
+    print("LoRaWAN ABP Credentials Generator for MultiGeiger")
     print("=" * 70)
     print()
 
-    # Generate DEVEUI
-    if args.deveui_from_mac:
-        try:
-            deveui = generate_deveui_from_mac(args.deveui_from_mac)
-            print(f"ℹ️  DEVEUI derived from MAC: {args.deveui_from_mac}")
-        except ValueError as e:
-            print(f"❌ Error: {e}", file=sys.stderr)
+    # Generate DevAddr
+    if args.devaddr:
+        devaddr = args.devaddr.replace(" ", "").upper()
+        if len(devaddr) != 8:
+            print(f"❌ Error: DevAddr must be 8 hex characters (got {len(devaddr)})", file=sys.stderr)
             sys.exit(1)
-    elif args.random_deveui:
-        deveui = generate_random_deveui()
-        print("⚠️  DEVEUI randomly generated (collision risk!)")
+        if not devaddr.startswith(("26", "27")):
+            print("⚠️  WARNING: DevAddr should start with 0x26 or 0x27 for TTN!", file=sys.stderr)
+        print(f"ℹ️  Using provided DevAddr: {devaddr}")
     else:
-        deveui = generate_random_deveui()
-        print("⚠️  DEVEUI randomly generated (collision risk!)")
+        devaddr = generate_devaddr()
+        print("🎲 Generated random DevAddr (TTN address space: 0x26)")
 
-    # Generate APPEUI and APPKEY
-    appeui = generate_appeui()
-    appkey = generate_appkey()
+    # Generate NwkSKey and AppSKey
+    nwkskey = generate_nwkskey()
+    appskey = generate_appskey()
 
     print()
     print("=" * 70)
-    print("Generated Credentials")
+    print("Generated ABP Credentials")
     print("=" * 70)
     print()
 
     # TTN format (with spaces, for manual entry in TTN console)
-    print("📋 For TTN Console (copy these values):")
+    print("📋 For TTN Console (ABP Mode - copy these values):")
     print("-" * 70)
-    print(f"Device EUI (DEVEUI):  {format_with_spaces(deveui)}")
-    print(f"App EUI (APPEUI):     {format_with_spaces(appeui)}")
-    print(f"App Key (APPKEY):     {format_with_spaces(appkey)}")
+    print(f"Device Address (DevAddr):  {format_with_spaces(devaddr)}")
+    print(f"Network Session Key (NwkSKey):  {format_with_spaces(nwkskey)}")
+    print(f"App Session Key (AppSKey):      {format_with_spaces(appskey)}")
     print()
 
     # MultiGeiger format (no spaces, for config page)
-    print("🔧 For MultiGeiger Config Page (paste these values):")
+    print("🔧 For MultiGeiger Web Config (paste these values):")
     print("-" * 70)
-    print(f"DEVEUI:  {deveui}")
-    print(f"APPEUI:  {appeui}")
-    print(f"APPKEY:  {appkey}")
+    print(f"DevAddr:  {devaddr}")
+    print(f"NwkSKey:  {nwkskey}")
+    print(f"AppSKey:  {appskey}")
     print()
 
     print("=" * 70)
     print("⚠️  Important Notes:")
     print("=" * 70)
-    print("1. You must manually register these credentials in TTN console")
-    print("2. In TTN, select 'Enter end device specifics manually'")
-    print("3. Choose: LoRaWAN 1.0.2, Europe 863-870 MHz")
-    print("4. Paste the values from 'For TTN Console' above")
-    print("5. Then paste 'For MultiGeiger Config Page' values into your device")
+    print("1. You must manually register these ABP credentials in TTN console")
+    print("2. In TTN, select 'Activation mode: Activation by personalization (ABP)'")
+    print("3. LoRaWAN version: MAC V1.0.2 or V1.0.3")
+    print("4. Regional Parameters: Europe 863-870 MHz (SF9 for RX2)")
+    print("5. Paste the values from 'For TTN Console' above")
+    print("6. Then paste 'For MultiGeiger Web Config' values into device settings")
+    print("7. Enable 'Send to LoRa' in MultiGeiger config")
     print()
-    print("🚨 RECOMMENDED: Let TTN generate credentials instead!")
+    print("🔧 Single-Channel Gateway Configuration:")
+    print("   - Frequency: 868.1 MHz (Channel 0)")
+    print("   - Spreading Factor: SF7")
+    print("   - ABP ensures immediate connectivity without OTAA join")
+    print()
+    print("🚨 RECOMMENDED: Let TTN generate ABP credentials instead!")
     print("   This ensures uniqueness and proper security.")
     print()
 

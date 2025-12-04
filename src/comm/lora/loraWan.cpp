@@ -22,36 +22,35 @@
 // Send a valid LoRaWAN packet using frequency and encryption settings matching
 // those of the The Things Network.
 //
-// This uses OTAA (Over-the-air activation), where where a DevEUI and
-// application key is configured, which are used in an over-the-air
-// activation procedure where a DevAddr and session keys are
-// assigned/generated for use with all further communication.
+// This uses ABP (Activation By Personalization), where DevAddr and session keys
+// (NwkSKey, AppSKey) are pre-configured and set directly without over-the-air join.
+// ABP is required for single-channel gateways like Dragino LG01-N which cannot
+// handle OTAA downlinks reliably.
 //
 // Note: LoRaWAN per sub-band duty-cycle limitation is enforced (1% in
 // g1, 0.1% in g2), but not the TTN fair usage policy.
 //
-// To use this code, first register your application and device with
-// the things network, to set or generate an AppEUI, DevEUI and AppKey.
-// Multiple devices can use the same AppEUI, but each device has its own
-// DevEUI and AppKey.
+// To use this code, register your device with TTN in ABP mode and configure
+// the DevAddr, NwkSKey, and AppSKey in the web interface.
 //
 // Do not forget to define the radio type correctly in
 // arduino-lmic/project_config/lmic_project_config.h or from your BOARDS.txt.
 
-// All these 3 LoRa parameters (DEVEUI, APPEUI and APPKEY) may be copied literally from the TTN console window.
-// The necessary reversal on DEVEUI and APPEUI is done by hex2data.
+// ABP Mode - OTAA functions still required by LMIC library but not used
+// These are stubs that should never be called since we use ABP (no join)
 void os_getArtEui(u1_t *buf) {
-  (void) hex2data(buf, (const char *) appeui, 8);
-  reverseByteArray(buf, 8);
+  // ABP mode - this function should never be called
+  memset(buf, 0, 8);
 }
 
 void os_getDevEui(u1_t *buf) {
-  (void) hex2data(buf, (const char *) deveui, 8);
-  reverseByteArray(buf, 8);
+  // ABP mode - this function should never be called
+  memset(buf, 0, 8);
 }
 
 void os_getDevKey(u1_t *buf) {
-  (void) hex2data(buf, (const char *) appkey, 16);
+  // ABP mode - this function should never be called
+  memset(buf, 0, 16);
 }
 
 // Schedule TX every this many seconds (might become longer due to duty cycle limitations).
@@ -74,6 +73,7 @@ void onEvent(ev_t ev) {
   switch (ev) {
   case EV_SCAN_TIMEOUT:
     txStatus = TX_STATUS_ENDING_ERROR;
+    log(INFO, "LoRa: Scan timeout - no gateway found");
     log(DEBUG, "EV_SCAN_TIMEOUT");
     break;
   case EV_BEACON_FOUND:
@@ -90,10 +90,12 @@ void onEvent(ev_t ev) {
     break;
   case EV_JOINING:
     txStatus = TX_STATUS_JOINING;
+    log(INFO, "LoRa: Joining TTN network (OTAA)...");
     log(DEBUG, "EV_JOINING");
     break;
   case EV_JOINED:
     txStatus = TX_STATUS_JOINED;
+    log(INFO, "LoRa: Successfully joined TTN!");
     log(DEBUG, "EV_JOINED");
     {
       u4_t netid = 0;
@@ -122,13 +124,16 @@ void onEvent(ev_t ev) {
   //   break;
   case EV_JOIN_FAILED:
     txStatus = TX_STATUS_ENDING_ERROR;
+    log(INFO, "LoRa: Join FAILED - check credentials (DEVEUI, APPEUI, APPKEY)");
     log(DEBUG, "EV_JOIN_FAILED");
     break;
   case EV_REJOIN_FAILED:
     txStatus = TX_STATUS_ENDING_ERROR;
+    log(INFO, "LoRa: Rejoin FAILED");
     log(DEBUG, "EV_REJOIN_FAILED");
     break;
   case EV_TXCOMPLETE:
+    log(INFO, "LoRa: Transmission complete");
     log(DEBUG, "EV_TXCOMPLETE (includes waiting for RX windows)");
     txStatus =   TX_STATUS_UPLINK_SUCCESS;
     if (LMIC.txrxFlags & TXRX_ACK) {
@@ -171,10 +176,12 @@ void onEvent(ev_t ev) {
   //   break;
   case EV_TXSTART:
     txStatus = TX_STATUS_UNKNOWN;
+    log(INFO, "LoRa: Starting transmission...");
     log(DEBUG, "EV_TXSTART");
     break;
   default:
     txStatus = TX_STATUS_UNKNOWN;
+    log(INFO, "LoRa: Unknown event: %u", (unsigned int) ev);
     log(DEBUG, "Unknown event: %u", (unsigned int) ev);
     break;
   }
@@ -182,26 +189,50 @@ void onEvent(ev_t ev) {
 
 
 void setup_lorawan() {
+  log(INFO, "LoRa: Initializing LMIC stack (ABP mode)...");
   txStatus = TX_STATUS_UNKNOWN;
+
   // LMIC init
   os_init();
   // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
   LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
-  // Setup the LoRaWan stack for TTN Europe
-  LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(1, 868300000, DR_RANGE_MAP(DR_SF12, DR_SF7B), BAND_CENTI);  // g-band
-  LMIC_setupChannel(2, 868500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(3, 867100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(4, 867300000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(5, 867500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(6, 867700000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(7, 867900000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);  // g-band
-  LMIC_setupChannel(8, 868800000, DR_RANGE_MAP(DR_FSK,  DR_FSK),  BAND_MILLI);  // g2-band
+  // Parse ABP credentials from hex strings
+  uint32_t devAddr;
+  uint8_t nwkSKey[16];
+  uint8_t appSKey[16];
+
+  // Convert DevAddr from hex string (e.g., "26011D01") to uint32_t
+  devAddr = strtoul(devaddr, NULL, 16);
+
+  // Convert NwkSKey and AppSKey from hex strings to byte arrays
+  hex2data(nwkSKey, (const char *) nwkskey, 16);
+  hex2data(appSKey, (const char *) appskey, 16);
+
+  log(INFO, "LoRa: Setting ABP session (DevAddr: 0x%08X)", devAddr);
+
+  // Set ABP session keys (netid=0 for TTN)
+  LMIC_setSession(0x1, devAddr, nwkSKey, appSKey);
+
+  // Configure for single-channel gateway (868.1 MHz, SF7)
+  // Disable all channels except channel 0 (868.1 MHz)
+  LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // Keep CH0
+  for (uint8_t i = 1; i < 9; i++) {
+    LMIC_disableChannel(i);  // Disable CH1-CH8
+  }
+
+  // Disable link check validation
   LMIC_setLinkCheckMode(0);
-  LMIC.dn2Dr = SF9;
+
+  // Set data rate to SF7 (fastest for single-channel)
   LMIC_setDrTxpow(DR_SF7, 14);
+
+  // Disable ADR (Adaptive Data Rate) for single-channel gateway
+  LMIC_setAdrMode(0);
+
+  log(INFO, "LoRa: ABP initialized (Single-Channel: 868.1 MHz, SF7)");
+  txStatus = TX_STATUS_JOINED;  // ABP is always "joined"
 }
 
 void poll_lorawan() {
@@ -218,17 +249,22 @@ void poll_lorawan() {
 // - rxBuffer : where the downlinked data will be stored
 // - rxSz : size of received data
 transmissionStatus_t lorawan_send(uint8_t txPort, uint8_t *txBuffer, uint8_t txSz, bool ack, uint8_t *rxPort, uint8_t *rxBuffer, uint8_t *rxSz) {
+  log(INFO, "LoRa: lorawan_send() called - port %d, %d bytes", txPort, txSz);
+
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & (OP_POLL | OP_TXDATA | OP_TXRXPEND)) {
+    log(INFO, "LoRa: LMIC busy (opmode=0x%02x), not sending", LMIC.opmode);
     log(DEBUG, "OP_POLL | OP_TXDATA | OP_TXRXPEND, not sending");
     return TX_STATUS_ENDING_ERROR;
   } else {
+    log(INFO, "LoRa: Queuing data for transmission...");
     txStatus = TX_STATUS_UNKNOWN;
     __rxPort = rxPort;
     __rxBuffer = rxBuffer;
     __rxSz = rxSz;
     // Prepare upstream data transmission at the next possible time.
     LMIC_setTxData2(txPort, txBuffer, txSz, ((ack) ? 1 : 0));
+    log(INFO, "LoRa: Waiting for transmission to complete (timeout: %d ms)...", LORA_TIMEOUT_MS);
     // wait for completion
     uint64_t start = millis();
     while (true) {
@@ -248,6 +284,7 @@ transmissionStatus_t lorawan_send(uint8_t txPort, uint8_t *txBuffer, uint8_t txS
         break;
       }
       if (millis() - start > LORA_TIMEOUT_MS) {
+        log(INFO, "LoRa: TIMEOUT after %d ms - reinitializing LMIC", LORA_TIMEOUT_MS);
         setup_lorawan();
         return TX_STATUS_TIMEOUT;
       }
