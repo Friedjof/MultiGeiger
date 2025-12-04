@@ -1,7 +1,7 @@
 #include "controller.hpp"
 
 // Measurement interval (default 2.5min) [sec]
-static const unsigned long MEASUREMENT_INTERVAL = 150;
+static const unsigned long MEASUREMENT_INTERVAL = 90;
 
 // Max time the greeting display will be on. [msec]
 static const unsigned long AFTERSTART = 5000;
