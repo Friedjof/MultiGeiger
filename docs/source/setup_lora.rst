@@ -182,41 +182,69 @@ Then click at **+ Add header entry** to add a special Header. Enter **X-SID** in
 sensor id (the number, you received from sensor.community, **not** the chip ID) in the right field.
 Enable **Uplink message**, all other selections remain disabled. Now click **Add webhook** (or **save changes**).
 
-TTN payload (example)
-~~~~~~~~~~~~~~~~~~~~~
+TTN Payload Decoder
+~~~~~~~~~~~~~~~~~~~
 
-In order to get readable values in the TTN console instead of solely data bytes, a small script can be inserted as payload decoder.
-Go to the TTN website, log in, click **Applications** to find the application you created above. 
+In order to get readable values in the TTN console instead of solely data bytes, a payload decoder
+can be configured. This decoder translates the binary payload into human-readable JSON data including
+calculated values like CPM (counts per minute), CPS (counts per second), and dose rate in µSv/h.
+
+Go to the TTN website, log in, click **Applications** to find the application you created above.
 From the left menu select **Payload formatters** and then **Uplink**.
 
-At **Formatter type** select **Javascript** and in **Formatter paramater** paste following code (replace existing code):
-
+At **Formatter type** select **Javascript** and in **Formatter parameter** paste the following code
+(replace existing code):
 
 ::
 
   function decodeUplink(input) {
-    var data = {};
-    if(input.fPort === 1) {
-      var minor = ((input.bytes[7] & 0xF) << 4) + (input.bytes[8] >> 4) ;
-      data.counts = ((input.bytes[0] * 256 + input.bytes[1]) * 256 + input.bytes[2]) * 256 + input.bytes[3];
-      data.sample_time = (input.bytes[4] * 256 + input.bytes[5]) * 256 + input.bytes[6];
-      data.tube = input.bytes[9];
-      data.sw_version = "" + (input.bytes[7] >>4 ) + "." + minor + "." + (input.bytes[8] & 0xF);
+    const bytes = input.bytes;
+    const fPort = parseInt(input.fPort) || 0;
+
+    if (fPort !== 1 || bytes.length !== 10) {
+      return {
+        data: {},
+        warnings: [`fPort: ${fPort}, bytes: ${bytes.length}`],
+        errors: []
+      };
     }
-    if(input.fPort === 2) {
-      var t = input.bytes[0] * 256 + input.bytes[1];
-      if (input.bytes[0] & 0x80) {
-        t |= 0xFFFF0000;
-      }
-      data.temp = t / 10 + "°C";
-      data.humidity = input.bytes[2] / 2 + "%";
-      data.press = ((input.bytes[3] * 256 + input.bytes[4]) / 10 ) + "hPa";
-    }
-    return  {
-      data: data,
+
+    const COUNTS = bytes[0] * 0x1000000 + bytes[1] * 0x10000 + bytes[2] * 0x100 + bytes[3];
+    const DT_MS = bytes[4] * 0x10000 + bytes[5] * 0x100 + bytes[6];
+    const SW_VERSION = bytes[7] * 0x100 + bytes[8];
+    const TUBE_NBR = bytes[9];
+
+    const CPS = DT_MS > 0 ? COUNTS / (DT_MS / 1000) : 0;
+    const CPM = DT_MS > 0 ? Math.round(COUNTS * 60000 / DT_MS * 10) / 10 : 0;
+    const USVH = CPS / 12.2792;  // Conversion factor for Si22G tube
+
+    return {
+      data: {
+        counts: COUNTS,
+        cpm: CPM,
+        cps: Math.round(CPS * 100) / 100,
+        usvh: Number(USVH.toFixed(3)),
+        sample_time_ms: DT_MS,
+        tube_number: TUBE_NBR,
+        sw_version: `V${(SW_VERSION >> 12) & 0x0F}.${(SW_VERSION >> 4) & 0xFF}.${SW_VERSION & 0x0F}`
+      },
       warnings: [],
-      error: []
+      errors: []
     };
   }
+
+**Decoded data fields:**
+
+- **counts**: Total number of GM tube pulses detected during the measurement interval
+- **cpm**: Counts per minute (extrapolated from counts and sample time)
+- **cps**: Counts per second (calculated)
+- **usvh**: Dose rate in µSv/h (microsieverts per hour) using Si22G conversion factor
+- **sample_time_ms**: Measurement interval in milliseconds
+- **tube_number**: GM tube type identifier (0x13=SBM-19, 0x14=SBM-20, 0x16=Si22G)
+- **sw_version**: MultiGeiger firmware version
+
+.. note::
+   The conversion factor 12.2792 CPS/µSv/h is specific to the Si22G tube. For other tube types,
+   this factor needs to be adjusted according to the tube's calibration data.
 
 

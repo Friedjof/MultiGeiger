@@ -567,9 +567,9 @@ unsigned long getESPchipID() {
 }
 
 char *buildSSID() {
-  // build SSID from ESP chip id
+  // build SSID from ESP chip id (last 6 hex digits of MAC)
   uint32_t id = getESPchipID();
-  sprintf(ssid, "ESP32-%d", id);
+  sprintf(ssid, "MultiGeiger-%06X", id & 0xFFFFFF);
   return ssid;
 }
 
