@@ -1,16 +1,15 @@
-name: CI Build
+name: Release Build
 
 on:
   push:
-    branches: [ master, main, develop ]
-  pull_request:
-    branches: [ master, main, develop ]
+    tags:
+      - '*'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -48,14 +47,16 @@ jobs:
         run: |
           pio run -e geiger
 
-      - name: Firmware size
+      - name: Package binaries
         run: |
-          pio run -e geiger -t size
+          mkdir -p binaries/geiger
+          cp .pio/build/geiger/firmware.bin binaries/geiger/ || true
+          cp .pio/build/geiger/firmware.elf binaries/geiger/ || true
+          ls -lh binaries/geiger
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: firmware-geiger-${{ github.sha }}
-          path: |
-            .pio/build/geiger/firmware.bin
-            .pio/build/geiger/firmware.elf
+          files: |
+            binaries/geiger/*
