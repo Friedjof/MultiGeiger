@@ -179,12 +179,13 @@ void MultiGeigerController::readThp(unsigned long current_ms) {
   static unsigned long last_timestamp = 0;
   if (!last_timestamp || (current_ms - last_timestamp) >= (MEASUREMENT_INTERVAL * 1000)) {
     last_timestamp = current_ms;
-    have_thp = sensors.readThp(temperature, humidity, pressure);
+    have_thp = sensors.readThp(temperature, humidity, pressure, gas_resistance, sensor_type);
   }
 }
 
 void MultiGeigerController::transmit(unsigned long current_ms, unsigned long current_counts, unsigned long gm_count_timestamp, unsigned long current_hv_pulses,
-                                     bool have_thp_in, float temperature_in, float humidity_in, float pressure_in, int wifi_status) {
+                                     bool have_thp_in, float temperature_in, float humidity_in, float pressure_in,
+                                     float gas_resistance_in, int sensor_type_in, int wifi_status) {
   static unsigned long last_counts = 0;
   static unsigned long last_hv_pulses = 0;
   static unsigned long last_timestamp = millis();
@@ -206,7 +207,7 @@ void MultiGeigerController::transmit(unsigned long current_ms, unsigned long cur
     log(DEBUG, "Measured GM: cpm= %d HV=%d", current_cpm, hv_pulses_delta);
 
     wifi.send(tubes[TUBE_TYPE].type, tubes[TUBE_TYPE].nbr, dt, hv_pulses_delta, counts, current_cpm,
-              have_thp_in, temperature_in, humidity_in, pressure_in, wifi_status);
+              have_thp_in, temperature_in, humidity_in, pressure_in, gas_resistance_in, sensor_type_in, wifi_status);
     mqtt.publishMeasurement(tubes[TUBE_TYPE].type, tubes[TUBE_TYPE].nbr, dt, hv_pulses_delta, counts, current_cpm,
                             have_thp_in, temperature_in, humidity_in, pressure_in, wifi_status);
   }
@@ -239,7 +240,7 @@ void MultiGeigerController::loopOnce() {
   if (Serial_Print_Mode == Serial_Statistics_Log)
     statisticsLog(gm_counts, gm_count_time_between);
 
-  transmit(current_ms, gm_counts, gm_count_timestamp, hv_pulses, have_thp, temperature, humidity, pressure, wifi_status);
+  transmit(current_ms, gm_counts, gm_count_timestamp, hv_pulses, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type, wifi_status);
 
   long loop_duration = millis() - current_ms;
   iotWebConf.delay((loop_duration < LOOP_DURATION) ? (LOOP_DURATION - loop_duration) : 0);

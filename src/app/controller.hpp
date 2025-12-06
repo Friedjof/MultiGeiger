@@ -60,6 +60,12 @@ public:
   /** @brief Get current pressure (hPa) */
   float getPressure() const { return pressure; }
 
+  /** @brief Get current gas resistance (kOhm, BME680 only) */
+  float getGasResistance() const { return gas_resistance; }
+
+  /** @brief Get THP sensor type (0=none, 280=BMP280, 2280=BME280, 680=BME680) */
+  int getSensorType() const { return sensor_type; }
+
   /** @brief Check if environmental sensors are available */
   bool hasThp() const { return have_thp; }
 
@@ -76,7 +82,8 @@ private:
   void oneMinuteLog(unsigned long current_ms, unsigned long current_counts);
   void statisticsLog(unsigned long current_counts, unsigned int time_between);
   void transmit(unsigned long current_ms, unsigned long current_counts, unsigned long gm_count_timestamp, unsigned long current_hv_pulses,
-                bool have_thp, float temperature, float humidity, float pressure, int wifi_status);
+                bool have_thp, float temperature, float humidity, float pressure,
+                float gas_resistance, int sensor_type, int wifi_status);
 
   IoModule io;
   Sensors sensors;
@@ -93,6 +100,8 @@ private:
   float temperature = 0.0f;
   float humidity = 0.0f;
   float pressure = 0.0f;
+  float gas_resistance = 0.0f;
+  int sensor_type = 0;
   unsigned long hv_pulses = 0;
   unsigned long gm_counts = 0;
   unsigned long gm_count_timestamp = 0;

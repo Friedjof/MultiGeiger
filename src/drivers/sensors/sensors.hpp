@@ -4,7 +4,7 @@
  *
  * Provides interfaces for:
  * - Geiger-Müller tube radiation detection
- * - Temperature, Humidity, Pressure (THP) sensors (BME280/BME680)
+ * - Temperature, Humidity, Pressure (THP) sensors (BMP280/BME280/BME680)
  * - High voltage monitoring
  */
 
@@ -12,6 +12,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
 #include <Adafruit_BME280.h>
 #include <Adafruit_BME680.h>
 
@@ -36,13 +37,14 @@ void read_GMC(unsigned long *counts, unsigned long *timestamp, unsigned int *bet
 void read_hv(bool *hv_error, unsigned long *pulses);
 
 bool setup_thp_sensor(void);
-bool read_thp_sensor(float *temperature, float *humidity, float *pressure);
+bool read_thp_sensor(float *temperature, float *humidity, float *pressure, float *gas_resistance, int *sensor_type);
+int get_thp_sensor_type(void);
 
 // Thin OO wrapper for sensor handling.
 class Sensors {
 public:
   bool beginThp() { return setup_thp_sensor(); }
-  bool readThp(float &t, float &h, float &p) { return read_thp_sensor(&t, &h, &p); }
+  bool readThp(float &t, float &h, float &p, float &g, int &type) { return read_thp_sensor(&t, &h, &p, &g, &type); }
 
   void beginTube() { setup_tube(); }
   void readTube(unsigned long &counts, unsigned long &timestamp, unsigned int &between) { read_GMC(&counts, &timestamp, &between); }

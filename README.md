@@ -10,7 +10,7 @@ The MultiGeiger is an **ESP32-based radioactivity measurement device** designed 
 - 📊 **Radiation Measurement** - Accurate detection using Geiger-Müller tubes with real-time CPM/CPS display
 - 🌐 **Modern Web Interface** - Responsive dashboard with live updates and easy configuration
 - 📡 **Multiple Connectivity** - WiFi, LoRaWAN/TTN, BLE, MQTT with TLS support
-- 🌡️ **Environmental Sensors** - Optional temperature, humidity, and pressure monitoring (BME280/BME680)
+- 🌡️ **Environmental Sensors** - Optional temperature, humidity, and pressure monitoring (BMP280/BME280/BME680)
 - ☁️ **Cloud Integration** - Automatic upload to sensor.community, madavi.de, OpenSenseMap, and custom endpoints
 - 🔋 **Low Power Design** - Optimized for battery operation with deep sleep support
 
@@ -232,7 +232,7 @@ MultiGeiger/
 │   │   ├── wifi/            # WiFi, HTTP, mDNS
 │   │   ├── lora/            # LoRaWAN (LMIC)
 │   │   └── mqtt/            # MQTT client
-│   ├── sensors/             # Geiger tube, BME280/680
+│   ├── sensors/             # Geiger tube, BMP280/BME280/BME680
 │   └── main.cpp             # Entry point
 ├── web/                     # Web interface
 │   ├── index.html           # Dashboard
@@ -317,7 +317,10 @@ See [tools/mqtt_logger/README.md](tools/mqtt_logger/README.md) for details.
 
 - ☢️ **Geiger-Müller tube** (various types supported: SBM-20, SBM-19, SI-3BG, etc.)
 - ⚡ **High voltage generator** (400-500V for GM tube)
-- 🌡️ **Optional**: BME280/BME680 environmental sensor (I²C)
+- 🌡️ **Optional**: BMP280/BME280/BME680 environmental sensor (I²C)
+  - **BMP280**: Temperature + Pressure only
+  - **BME280**: Temperature + Humidity + Pressure
+  - **BME680**: Temperature + Humidity + Pressure + Air Quality (Gas)
 - 📡 **Optional**: LoRa module (SX1276/RFM95W for TTN)
 
 See hardware documentation in [docs/hardware/](docs/hardware/) for schematics and PCB files.

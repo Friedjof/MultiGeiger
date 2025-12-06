@@ -1,12 +1,7 @@
 // OLED display related code
 
 #include "display.hpp"
-
-#define PIN_DISPLAY_ON 21
-
-#define PIN_OLED_RST 16
-#define PIN_OLED_SCL 15
-#define PIN_OLED_SDA 4
+#include <Wire.h>
 
 void DisplayModule::startScreen() {
   char line[20];
@@ -39,6 +34,11 @@ static DisplayModule *gActiveDisplay = &gDisplay;
 void DisplayModule::begin(bool loraHardware) {
   gActiveDisplay = this;  // use this instance for legacy wrappers
   isLoraBoard = loraHardware;
+
+  // Initialize I2C bus with custom pins for both display and BME sensors
+  // SDA=GPIO4, SCL=GPIO15
+  Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
+
   if (isLoraBoard) {
     pu8x8 = &u8x8_lora;
 //    pinMode(PIN_DISPLAY_ON, INPUT);

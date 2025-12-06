@@ -337,41 +337,78 @@ int send_http_thp_2_madavi(HttpsClient *client, float temperature, float humidit
 }
 
 // LoRa payload:
-// To minimise airtime and follow the 'TTN Fair Access Policy', we only send necessary bytes.
+// To minimise airtime and follow the 'TTN Fair Access Policy', we send all data in one message.
 // We do NOT use Cayenne LPP.
 // The payload will be translated via http integration and a small program to be compatible with sensor.community.
 // For byte definitions see ttn2luft.pdf in docs directory.
-int send_ttn_geiger(int tube_nbr, unsigned int dt, unsigned int gm_counts) {
-  unsigned char ttnData[10];
-  // first the number of GM counts
+//
+// Combined payload structure (18 bytes total):
+// Bytes 0-3:   GM counts (uint32_t)
+// Bytes 4-6:   Measurement interval in ms (uint24_t, max ~4 hours)
+// Bytes 7-8:   Software version (uint16_t)
+// Byte  9:     Tube type number (uint8_t)
+// Bytes 10-11: Temperature * 10 (int16_t, signed, e.g., 25.3°C = 253, -5.2°C = -52)
+// Byte  12:    Humidity * 2 (uint8_t, e.g., 50.5% = 101)
+// Bytes 13-14: Pressure * 10 (uint16_t, e.g., 1013.25 hPa → 10132)
+// Byte  15:    THP sensor type (uint8_t: 0=none, 1=BMP280, 2=BME280, 3=BME680)
+// Bytes 16-17: Gas resistance in kOhm (uint16_t, BME680 only, 0 for other sensors)
+int send_ttn_combined(int tube_nbr, unsigned int dt, unsigned int gm_counts,
+                      bool have_thp, float temperature, float humidity, float pressure,
+                      float gas_resistance, int sensor_type) {
+  unsigned char ttnData[18];
+
+  // Geiger data (10 bytes)
   ttnData[0] = (gm_counts >> 24) & 0xFF;
   ttnData[1] = (gm_counts >> 16) & 0xFF;
   ttnData[2] = (gm_counts >> 8) & 0xFF;
   ttnData[3] = gm_counts & 0xFF;
-  // now 3 bytes for the measurement interval [in ms] (max ca. 4 hours)
   ttnData[4] = (dt >> 16) & 0xFF;
   ttnData[5] = (dt >> 8) & 0xFF;
   ttnData[6] = dt & 0xFF;
-  // next two bytes are software version
   ttnData[7] = (lora_software_version >> 8) & 0xFF;
   ttnData[8] = lora_software_version & 0xFF;
-  // next byte is the tube number
   ttnData[9] = tube_nbr;
-  return lorawan_send(1, ttnData, 10, false, NULL, NULL, NULL);
+
+  // THP+Gas data (8 bytes) - send zeros if no sensor available
+  if (have_thp) {
+    ttnData[10] = ((int)(temperature * 10)) >> 8;
+    ttnData[11] = ((int)(temperature * 10)) & 0xFF;
+    ttnData[12] = (int)(humidity * 2);
+    ttnData[13] = ((int)(pressure * 10)) >> 8;
+    ttnData[14] = ((int)(pressure * 10)) & 0xFF;
+
+    // Sensor type mapping: 0=BMP280, 2280=BME280, 680=BME680 → 1, 2, 3
+    uint8_t sensor_type_byte = 0;
+    if (sensor_type == 280) sensor_type_byte = 1;       // BMP280
+    else if (sensor_type == 2280) sensor_type_byte = 2; // BME280
+    else if (sensor_type == 680) sensor_type_byte = 3;  // BME680
+    ttnData[15] = sensor_type_byte;
+
+    // Gas resistance (BME680 only)
+    ttnData[16] = ((int)gas_resistance) >> 8;
+    ttnData[17] = ((int)gas_resistance) & 0xFF;
+  } else {
+    // No THP sensor: send zeros
+    memset(&ttnData[10], 0, 8);
+  }
+
+  return lorawan_send(1, ttnData, 18, false, NULL, NULL, NULL);
+}
+
+// Legacy functions kept for backward compatibility (now just wrappers)
+int send_ttn_geiger(int tube_nbr, unsigned int dt, unsigned int gm_counts) {
+  return send_ttn_combined(tube_nbr, dt, gm_counts, false, 0.0, 0.0, 0.0, 0.0, 0);
 }
 
 int send_ttn_thp(float temperature, float humidity, float pressure) {
-  unsigned char ttnData[5];
-  ttnData[0] = ((int)(temperature * 10)) >> 8;
-  ttnData[1] = ((int)(temperature * 10)) & 0xFF;
-  ttnData[2] = (int)(humidity * 2);
-  ttnData[3] = ((int)(pressure / 10)) >> 8;
-  ttnData[4] = ((int)(pressure / 10)) & 0xFF;
-  return lorawan_send(2, ttnData, 5, false, NULL, NULL, NULL);
+  // This function is deprecated and should not be called anymore
+  // Kept for compatibility but does nothing (combined function handles THP)
+  log(INFO, "send_ttn_thp() called but deprecated - use send_ttn_combined()");
+  return TX_STATUS_UPLINK_SUCCESS;
 }
 
 void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
-                   int have_thp, float temperature, float humidity, float pressure, int wifi_status) {
+                   int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status) {
   int rc1, rc2;
 
   #if SEND2CUSTOMSRV
@@ -417,14 +454,11 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     log(INFO, "  - isLoraBoard: %d, sendToLora: %d, devaddr: %s", isLoraBoard, sendToLora, devaddr);
     set_status(STATUS_TTN, ST_TTN_SENDING);
     display_status();
-    rc1 = send_ttn_geiger(tube_nbr, dt, gm_counts);
-    log(INFO, "TTN send_ttn_geiger result: %d", rc1);
-    rc2 = have_thp ? send_ttn_thp(temperature, humidity, pressure) : TX_STATUS_UPLINK_SUCCESS;
-    if (have_thp) {
-      log(INFO, "TTN send_ttn_thp result: %d", rc2);
-    }
-    ttn_ok = (rc1 == TX_STATUS_UPLINK_SUCCESS) && (rc2 == TX_STATUS_UPLINK_SUCCESS);
-    log(INFO, "TTN transmission %s (rc1=%d, rc2=%d)", ttn_ok ? "SUCCESS" : "FAILED", rc1, rc2);
+    // Send combined message with GM + THP + Gas data in one transmission
+    rc1 = send_ttn_combined(tube_nbr, dt, gm_counts, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type);
+    log(INFO, "TTN send_ttn_combined result: %d (have_thp=%d, sensor_type=%d)", rc1, have_thp, sensor_type);
+    ttn_ok = (rc1 == TX_STATUS_UPLINK_SUCCESS);
+    log(INFO, "TTN transmission %s (rc=%d)", ttn_ok ? "SUCCESS" : "FAILED", rc1);
     set_status(STATUS_TTN, ttn_ok ? ST_TTN_IDLE : ST_TTN_ERROR);
     display_status();
   } else {

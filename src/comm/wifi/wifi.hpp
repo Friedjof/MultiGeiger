@@ -61,7 +61,7 @@ void setup_webconf(bool loraHardware);
 
 void setup_transmission(const char *version, char *ssid, bool lora);
 void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
-                   int have_thp, float temperature, float humidity, float pressure, int wifi_status);
+                   int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status);
 
 // The Arduino LMIC wants to be polled from loop(). This takes care of that on LoRa boards.
 void poll_transmission(void);
@@ -74,7 +74,7 @@ public:
   void pollTx() { poll_transmission(); }
   void pollWeb() { iotWebConf.doLoop(); }
   void send(const String &tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
-            int have_thp, float temperature, float humidity, float pressure, int wifi_status) {
-    transmit_data(tube_type, tube_nbr, dt, hv_pulses, gm_counts, cpm, have_thp, temperature, humidity, pressure, wifi_status);
+            int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status) {
+    transmit_data(tube_type, tube_nbr, dt, hv_pulses, gm_counts, cpm, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type, wifi_status);
   }
 };

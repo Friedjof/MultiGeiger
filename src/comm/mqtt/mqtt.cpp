@@ -52,7 +52,7 @@ void MqttPublisher::ensureConnected() {
     return;
   lastReconnectAttempt = now;
 
-  String clientId = "MultiGeiger-" + baseTopic;
+  String clientId = baseTopic;
   clientId.replace("/", "");  // keep it simple for broker
   bool useAuth = config.username.length() > 0;
   bool connected;

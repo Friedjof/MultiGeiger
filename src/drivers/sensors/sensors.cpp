@@ -1,27 +1,38 @@
 #include "sensors.hpp"
 
 #include <driver/gpio.h>
+#include <Wire.h>
 
 // THP sensor handling
 
 static int type_thp = 0;
 
+Adafruit_BMP280 bmp280;
 Adafruit_BME280 bme280;
 Adafruit_BME680 bme680;
 
 bool setup_thp_sensor(void) {
-  // BME280
-  if (bme280.begin(BME280_ADDRESS))
-    type_thp = 280;
-  else if (bme280.begin(BME280_ADDRESS_ALTERNATE))
-    type_thp = 280;
+  // Try BME680 first (has Temperature, Humidity, Pressure + Gas)
+  if (bme680.begin(BME68X_I2C_ADDR_LOW))
+    type_thp = 680;
+  else if (bme680.begin(BME68X_I2C_ADDR_HIGH))
+    type_thp = 680;
 
-  // BME680
+  // Try BME280 (has Temperature, Humidity, Pressure)
   if (type_thp == 0) {
-    if (bme680.begin(BME68X_I2C_ADDR_LOW))
-      type_thp = 680;
-    else if (bme680.begin(BME68X_I2C_ADDR_HIGH))
-      type_thp = 680;
+    if (bme280.begin(BME280_ADDRESS, &Wire))
+      type_thp = 2280;
+    else if (bme280.begin(BME280_ADDRESS_ALTERNATE, &Wire))
+      type_thp = 2280;
+  }
+
+  // Try BMP280 with explicit Chip-ID (0x58) at both common I2C addresses
+  // This is critical: BMP280 has Chip-ID 0x58, BME280 has 0x60
+  if (type_thp == 0) {
+    if (bmp280.begin(0x76, 0x58))  // Address 0x76, Chip-ID 0x58
+      type_thp = 280;
+    else if (bmp280.begin(0x77, 0x58))  // Address 0x77, Chip-ID 0x58
+      type_thp = 280;
   }
 
   switch (type_thp) {
@@ -34,33 +45,61 @@ bool setup_thp_sensor(void) {
     bme680.setGasHeater(300, 150); // 300*C for 150 ms
     log(INFO, "BME_Status: ok,  ID: BME680");
     break;
+  case 2280:
+    log(INFO, "BME_Status: ok,  ID: BME280 (Adafruit)");
+    break;
   case 280:
-    log(INFO, "BME_Status: ok,  ID: BME280");
+    // Configure BMP280 for optimal accuracy
+    bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Operating Mode
+                       Adafruit_BMP280::SAMPLING_X2,      // Temp. oversampling
+                       Adafruit_BMP280::SAMPLING_X16,     // Pressure oversampling
+                       Adafruit_BMP280::FILTER_X16,       // Filtering
+                       Adafruit_BMP280::STANDBY_MS_500);  // Standby time
+    log(INFO, "BMP_Status: ok,  ID: BMP280");
     break;
   default:
-    log(INFO, "BME_Status: not found");
+    log(INFO, "BMP/BME_Status: not found");
     break;
   }
   return (type_thp > 0);
 }
 
-bool read_thp_sensor(float *temperature, float *humidity, float *pressure) {
+int get_thp_sensor_type(void) {
+  return type_thp;
+}
+
+bool read_thp_sensor(float *temperature, float *humidity, float *pressure, float *gas_resistance, int *sensor_type) {
+  *sensor_type = type_thp;
+
   if (type_thp == 280) {
+    // BMP280 (Adafruit library) - no humidity sensor, no gas sensor
+    *temperature = bmp280.readTemperature();
+    *pressure = bmp280.readPressure() / 100.0;  // Convert Pa to hPa
+    *humidity = 0.0;  // BMP280 has no humidity sensor
+    *gas_resistance = 0.0;  // BMP280 has no gas sensor
+    return true;
+  } else if (type_thp == 2280) {
+    // Adafruit BME280 - no gas sensor
     *temperature = bme280.readTemperature();
     *humidity = bme280.readHumidity();
-    *pressure = bme280.readPressure();
+    *pressure = bme280.readPressure() / 100.0;  // Convert Pa to hPa
+    *gas_resistance = 0.0;  // BME280 has no gas sensor
   } else if (type_thp == 680) {
+    // Adafruit BME680 - has gas sensor
     if (!bme680.performReading()) {
       log(INFO, "BME680: Failed to perform reading");
       return false;
     }
     *temperature = bme680.temperature;
     *humidity = bme680.humidity;
-    *pressure = bme680.pressure;
+    *pressure = bme680.pressure / 100.0;  // Convert Pa to hPa
+    *gas_resistance = bme680.gas_resistance / 1000.0;  // Convert Ohm to kOhm
   } else {
     *temperature = 0.0;
     *humidity = 0.0;
     *pressure = 0.0;
+    *gas_resistance = 0.0;
+    *sensor_type = 0;
   }
   return (type_thp > 0);
 }
