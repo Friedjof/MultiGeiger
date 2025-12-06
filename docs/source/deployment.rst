@@ -116,6 +116,6 @@ Description of the BFS-ODL measurement network (german):
 - `Messnetz <https://www.bfs.de/SharedDocs/Downloads/BfS/DE/broschueren/ion/radioaktivitaetsmessnetz.pdf?__blob=publicationFile&v=5>`_
 - `ODL-Sonde <https://odlinfo.bfs.de/DE/themen/wie-wird-gemessen/odl-sonde.html>`_
 
-Video interview about the BFS-ODL measurement network (german):
+Video interview about the BFS-ODL measurement network (German):
 
-- `Interview über das BFS-ODL-Netzwerk <https://www.bfs.de/SharedDocs/Videos/BfS/DE/kt-interview-umweltueberwachung.html>`_
+- `Interview about the BFS-ODL network <https://www.bfs.de/SharedDocs/Videos/BfS/DE/kt-interview-umweltueberwachung.html>`_

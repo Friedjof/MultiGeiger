@@ -4,27 +4,27 @@
 Assembly
 ========
 
-.. Die erste Version dieser Anleitung stammte von einem Handout von Jürgen Böhringer mit dem Titel ``Wie baue ich einen Multigeiger?`` (damals: HW-Version V1.4 jb/rxf 2019-09  -  Handout-Version 2021-03-03)
+.. The first version of this guide was based on a handout by Jürgen Böhringer titled
+   "Wie baue ich einen Multigeiger?" (HW version V1.4 jb/rxf 2019-09 - handout 2021-03-03).
 
 .. image:: images/ecocurious.png
    :width: 25%
    :align: right
 
-Ergebnis
+Overview
 ########
-Das Multigeigerprojekt ist eine Idee der `Ecocurious-Initiative <https://ecocurious.de/projekte/multigeiger-2/>`_.
-Das dazugehörige Open-Source Multigeigermessgerät zum Messen radioaktiver Gammastrahlung wird von der Community entwickelt.
-Die Echtzeitdaten der stationären Geräte werden per LoRaWAN oder WiFi/WLAN an einen Server gefunkt und auf einer `Karte <https://ecocurious.de/multigeiger-karte/>`_ visualisiert.
-So entsteht ein Radioaktivitätsmessnetz in Bürgerhand, das wir hiermit aufbauen wollen.
-Herzliche Einladung zum Mitmachen!
+The MultiGeiger project is an idea by the `Ecocurious initiative <https://ecocurious.de/projekte/multigeiger-2/>`_.
+The open-source MultiGeiger device for measuring gamma radiation is being developed by the community.
+Real-time data from stationary units is transmitted via LoRaWAN or WiFi to a server and visualized on a `map <https://ecocurious.de/multigeiger-karte/>`_.
+This builds a citizen-operated radiation monitoring network. You are warmly invited to join!
 
 .. image:: images/build_01_final.jpg
    :width: 100%
 
-Bauteile
-########
+Parts
+#####
 
-Elektronikbauteile aus (s. `Stückliste <https://github.com/ecocurious2/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_) zunächst sortieren und auf Vollständigkeit prüfen:
+Sort the electronics parts first (see the `bill of materials <https://github.com/ecocurious2/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_) and check for completeness.
 
 .. |parts01| image:: images/build_02_parts_01.jpg
    :width: 100px
@@ -78,329 +78,298 @@ Elektronikbauteile aus (s. `Stückliste <https://github.com/ecocurious2/MultiGei
    :width: 200px
 
 +-------+---+------------------------------------+------------------------------------------+
-| ID(s) | # | Bild                               | Typ                                      |
+| ID(s) | # | Picture                            | Part                                     |
 +=======+===+====================================+==========================================+
-| T1    | 1 | |parts01|                          | N-MOS-Transistor BSP125                  |
+| T1    | 1 | |parts01|                          | BSP125 N-MOS transistor                  |
 +-------+---+------------------------------------+------------------------------------------+
-| R1    | 1 | |parts02|                          | 10K Widerstand braun-schwarz-orange-gold |
+| R1    | 1 | |parts02|                          | 10K resistor (brown-black-orange-gold)   |
 +-------+---+------------------------------------+------------------------------------------+
-| R2 R5 | 2 | |parts03|                          | 1,0M Widerstand braun-schwarz-grün-gold  |
+| R2 R5 | 2 | |parts03|                          | 1.0M resistor (brown-black-green-gold)   |
 +-------+---+------------------------------------+------------------------------------------+
-| R3 R4 | 2 | |parts04|                          | 4,7M Widerstand gelb-violett-grün-gold   |
+| R3 R4 | 2 | |parts04|                          | 4.7M resistor (yellow-violet-green-gold) |
 +-------+---+------------------------------------+------------------------------------------+
-| D1 D2 | 2 | |parts05|                          | Z-Diode ZY 200                           |
+| D1 D2 | 2 | |parts05|                          | Zener diode ZY 200                       |
 +-------+---+------------------------------------+------------------------------------------+
-| D3    | 1 | |parts06|                          | Z-Diode BZX55C3V3                        |
+| D3    | 1 | |parts06|                          | Zener diode BZX55C3V3                    |
 +-------+---+------------------------------------+------------------------------------------+
-| D4    | 1 | |parts07|                          | Gleichrichterdiode BYV 26E               |
+| D4    | 1 | |parts07|                          | Rectifier diode BYV 26E                  |
 +-------+---+------------------------------------+------------------------------------------+
-| D6    | 1 | |parts08|                          | Gleichrichterdiode GP10Y                 |
+| D6    | 1 | |parts08|                          | Rectifier diode GP10Y                    |
 +-------+---+------------------------------------+------------------------------------------+
-| C1    | 1 | |parts09|                          | ELKO Elektrolytkondensator 100 uF, 16 V  |
+| C1    | 1 | |parts09|                          | Electrolytic capacitor 100 uF, 16 V      |
 +-------+---+------------------------------------+------------------------------------------+
-| C2    | 1 | |parts10|                          | Folienkondensator 10nF, 100V 0.01  100-  |
+| C2    | 1 | |parts10|                          | Film capacitor 10 nF, 100 V (0.01 100-)  |
 +-------+---+------------------------------------+------------------------------------------+
-| C3    | 1 | |parts11|                          | Folienkondensator 100nF, 630V 0.1  630-  |
+| C3    | 1 | |parts11|                          | Film capacitor 100 nF, 630 V (0.1 630-)  |
 +-------+---+------------------------------------+------------------------------------------+
-| C4    | 1 | |parts12|                          | Folienkondensator 100pF, 1000V 100/1000- |
+| C4    | 1 | |parts12|                          | Film capacitor 100 pF, 1000 V (100/1000-)|
 +-------+---+------------------------------------+------------------------------------------+
-| L1    | 1 | |parts13|                          | Spule 150mH 154J                         |
+| L1    | 1 | |parts13|                          | 150 mH inductor 154J                     |
 +-------+---+------------------------------------+------------------------------------------+
-| Pz1   | 1 | |parts14|                          | Piezo-Lautsprecher                       |
+| Pz1   | 1 | |parts14|                          | Piezo speaker                            |
 +-------+---+------------------------------------+------------------------------------------+
-| X1 X2 | 2 | |parts15|                          | Zählrohrhalter                           |
+| X1 X2 | 2 | |parts15|                          | Geiger tube holder                       |
 +-------+---+------------------------------------+------------------------------------------+
-|       | 2 | |parts16|                          | Buchsenleiste Microcontroler-Modul       |
+|       | 2 | |parts16|                          | Female header for microcontroller module |
 +-------+---+------------------------------------+------------------------------------------+
-|       | 2 | |parts17|                          | Je 30 cm isolierte Kupferlitze           |
+|       | 2 | |parts17|                          | 30 cm insulated copper wire (each)       |
 +-------+---+------------------------------------+------------------------------------------+
-|       | 1 |                                    | Micro-USB Stromversorgung                |
+|       | 1 |                                    | Micro-USB power supply                   |
 +-------+---+------------------------------------+------------------------------------------+
 
-Lötarbeiten
-###########
+Soldering Work
+##############
 
-Feldeffekt-Transistor T1
-------------------------
+Field-effect transistor T1
+--------------------------
 
-Als erstes Bauteil wird das einzige Bauteil im SMD-Bauform montiert.
-Mit Klebeband (Kreppband hat sich bewährt) wird er so auf die Platine geklebt, so dass die drei Pins sichtbar sind.
-Dann werden die vorderen Anschlüsse verlötet, das Klebeband vorsichtig entfernt und der hintere Anschluss verlötet.
+Start with the only SMD part on the board.
+Fix it to the PCB with masking tape so the three pins remain visible.
+Solder the front pins first, remove the tape carefully, then solder the rear pin.
 
 .. image:: images/build_03_solderingTransistor.jpg
    :width: 50%
    :align: center
 
-Widerstände und Dioden
-----------------------
+Resistors and diodes
+--------------------
 
-Die Widerstände und Dioden werden alle in einer Abbiegevorrichtung (oder entsprechend mit der Hand oder einer kleinen Zange) gebogen.
-Die Breite ist immer vier Einheiten – sprich ca. 10 mm.
+Bend all resistors and diodes with a bending tool (or gently by hand/small pliers).
+The width is always four grid units (about 10 mm).
 
 .. image:: images/build_04_bending.jpg
    :width: 70%
    :align: center
 
-Anschließend wird die Platine mit den Widerständen und Dioden bestückt.
-Bei den Dioden unbedingt auf die Polarität achten! Die Kathode (Minus-Pol) ist mit einem Strich auf Platine und Bauteil markiert.
+Populate the PCB with the resistors and diodes.
+Mind diode polarity: the cathode (negative) is marked with a stripe on both PCB and part.
 
 .. image:: images/build_05_soldering_before.jpg
    :width: 100%
 
-Vor dem Löten der Unterseite werden die Bauteile auf der Oberseite mit Klebeband fixiert, oder die Beinchen der Bauteile durch leichtes Auseinanderbiegen verklemmt.
-Dann Bauteile anlöten, Klebeband entfernen und überschüssigen Draht abschneiden.
+Before soldering on the bottom side, fix the parts on the top with masking tape or slightly bend the leads outward to hold them.
+Then solder the parts, remove the tape, and trim excess leads.
 
-.. note:: Verletzungsgefahr: Beim Abschneiden darauf achten, dass der davonfliegende Draht niemanden verletzten kann.
-   Möglichst festhalten beim Abschneiden!
+.. note:: Risk of injury: take care that clipped leads cannot hit anyone. Hold the lead while cutting.
 
 .. image:: images/build_06_soldering_before_withTape.jpg
    :width: 70%
    :align: center
 
-Kondensatoren und restliche Bauteile
-------------------------------------
+Capacitors and remaining parts
+------------------------------
 
-Der Elektrolytkondensator (Elko) wird vorher mit einer Flachzange angewinkelt. Beim Elko unbedingt auf die Polung achten:
-Auf dem Elko ist der „–“-Pol markiert, auf der Platine der „+“-Pol. Die Beschriftungen müssen sich gegenüber liegen.
-Der Zählrohrhalter muss so herum eingesetzt werden, dass das Zählrohr nach außen steht kann – am besten testen!
-Dann die Bauteile mit Klebeband fixieren, anlöten und den überschüssigen Draht abschneiden.
+Pre-bend the electrolytic capacitor leads with flat-nose pliers and double-check polarity:
+the ``-`` pin is marked on the capacitor, the ``+`` pad on the PCB. Marks must face each other.
+Insert the tube holder so the Geiger tube points outward - test-fit to be sure.
+Fix the parts with masking tape, solder, and trim the leads.
 
-Kondensatoren, Zählrohrhalter, Spule, Piezo-Lautsprecher sind bestückt:
+Capacitors, tube holder, inductor, and piezo installed:
 
 .. image:: images/build_07_soldering_filmCapacitors.jpg
    :width: 100%
-   :alt: Kondensatoren, Zählrohrhalter, Spule, Piezo-Lautsprecher sind bestückt
+   :alt: Capacitors, tube holder, inductor, piezo installed
 
-Buchsenleisten und Mikrocontroller-Modul
-----------------------------------------
+Headers and microcontroller module
+----------------------------------
 
-Die Buchsenleiste muss vorher evtl. noch gekürzt werden.
+Shorten the female headers if needed.
 
-.. note:: Dabei muss der Seitenschneider genau auf dem **letzten nicht mehr benötigten Kontakt** angesetzt werden – **nicht dort wo man ihn eigentlich kürzen will** – ansonsten kann sie splittern.
-   Beim Abschneiden wegfliegende Teile möglichst festhalten!
+.. note:: When cutting, place the side cutter on the **last unneeded contact** - not at the desired length - otherwise the plastic can split.
+   Hold on to any pieces that may fly away.
 
 .. image:: images/build_08_soldering_femaleConnectorStrip.jpg
    :width: 50%
    :align: center
 
-Wird der große Piezo-Lautsprecher verwendet, so sollte die Buchsenleiste mit einer Feile etwas abgefeilt werden (vorher ausprobieren).
-Am einfachsten geht das an der originalen, nicht bearbeiteten Seite der Buchsenleiste.
-Je nachdem, welches Mikrocontroller-Board verwendet wird, müssen die Buchsenleisten an den entsprechenden Stellen bestückt werden.
+If you use the large piezo speaker, file the header slightly so everything fits (test first).
+The easiest place to file is the original, uncut edge of the header strip.
+Populate the header positions that match your microcontroller board.
 
 .. image:: images/build_09_soldering_femaleConnectorStrip_location.jpg
    :width: 100%
 
-Die Winkel der Buchsenleiste sollten genau stimmen. Daher am besten so vorgehen:
+Header angles should be precise. A reliable approach:
 
-* Die erste Buchsenleiste einstecken.
-* Von unten her eine Lötstelle in der Mitte löten, die Lötstelle nochmals heiß machen und gleichzeitig die Buchsenleiste justieren (rechter Winkel, alle Pins richtig).
-* Die zweite Buchsenleiste einstecken.
-* In beide Buchsenleisten die Stiftleiste aus dem Mikrocontroller-Modul-Set einstecken, so dass deren längerer Teil der Stiftleiste in der Buchsenleiste steckt.
-* Das Mikrocontroller-Modul aufstecken, so dass das Display sichtbar ist und die Mikro-USB-Buchse über dem Piezo-Lautsprecher liegt.
-* Alles mit einem schmalen Klebeband fixieren (siehe Bild unten), so dass alle Lötstellen zugänglich sind.
-* Nun können alle Kontakte gelötet werden.
+* Insert the first header.
+* From the bottom, solder one joint in the middle, reheat it, and align the header (right angle, all pins straight).
+* Insert the second header.
+* Plug the long pin headers from the microcontroller kit into both female headers so the long side sits in the female header.
+* Mount the microcontroller module so the display is visible and the micro-USB socket is above the piezo speaker.
+* Fix everything with narrow masking tape (see photo) while keeping all joints accessible.
+* Solder all contacts.
 
-.. note:: Das OLED-Grafikdisplay ist über eine dünne Flex-Leitung angeschlossen, die nicht zu heiß werden darf.
-   Im Zweifel lötet man die Pins in der Nähe der Flex-Leitung nicht an – sie werden nicht benötigt.
+.. note:: The OLED display is attached via a thin flex cable that must not overheat.
+   If in doubt, skip soldering pins near the flex cable - they are not needed.
 
 .. image:: images/build_10_soldering_femaleConnectorStripESP32withTape.jpg
    :width: 100%
 
-Nach dem Löten kann das Mikrocontroller-Modul mit wippenden Bewegungen vorsichtig abgezogen werden.
+After soldering, carefully remove the microcontroller module with a rocking motion.
 
-* Beim Mikrocontroller-Modul sind Pin-Beschriftungsaufkleber mit dabei.
-  Diese können jetzt seitlich aufgeklebt werden.
-  Welcher Pin wo ist, steht auf der Unterseite des Mikrocontroller-Moduls.
-* Das Kabel für den Anschluss der Zählrohr-Kathode (Minus-Anschluss) an Klammer und Platine anlöten.
-* Kabel mit jeweils einem Tropfen Heißkleber sichern (Zugentlastung).
-* Sichtkontrolle (hast du Lötstellen vergessen, sind Lötbrücken entstanden, ...).
-* Mikrocontroller-Modul wieder aufstecken.
-* Zählrohr anklemmen: der Plus-Pol (Anode) ist markiert und muss in Richtung Platine zeigen.
-* Eine erste Funktionskontrolle ist nun möglich, s. `Inbetriebnahme`_.
+* Use the pin label stickers that come with the module; apply them to the sides. Pin mapping is printed on the bottom of the board.
+* Solder the cable for the Geiger tube cathode (negative) to the clip and PCB.
+* Secure cables with a drop of hot glue for strain relief.
+* Visual inspection: check for missing joints or solder bridges.
+* Reattach the microcontroller module.
+* Connect the Geiger tube; the positive pin (anode) is marked and must face the PCB.
+* You can now perform a first functional test; see :ref:`usage`.
 
-Fertige Geigerzähler- und Mikrocontrollerplatine:
+Finished Geiger counter and microcontroller board:
 
 .. image:: images/build_11_soldering_done.jpg
    :width: 100%
-   :alt: Fertige Geigerzähler- und Mikrocontrollerplatine
+   :alt: Finished Geiger counter and microcontroller board
 
-.. note:: Das dünne Glas des OLED-Grafikdisplays ist empfindlich.
-          Bitte keine Kraft auf das Display ausüben, sondern nur auf die Mikrocontrollerplatine!
+.. note:: The thin glass of the OLED is fragile. Avoid pressing on the display - apply force only to the microcontroller board.
 
-.. warning:: Verletzungsgefahr: Auf der Geigerzählerplatine wird eine **Spannung von 400 Volt** erzeugt.
-   Diese hält sich auch noch längere Zeit **nach dem Ausschalten des Geräts**.
-   Bei Berührung kann es zu kleineren Stromschlägen kommen, die normalerweise harmlos sind.
-   Dennoch sollten sie vermieden werden!
+.. warning:: Danger: the Geiger board generates **400 V**.
+   The voltage remains for some time **after power-off**.
+   Touching it can cause small shocks - usually harmless but should be avoided.
 
    .. image:: images/build_12_highVoltageWarningSign.png
       :width: 70%
       :align: center
 
+   **Discharge the capacitor before working on the circuit.**
+   The simplest way is to short anode and cathode of the tube for about one second with a second cable (~30 cm).
+   This prevents unpleasant shocks and protects the circuitry.
 
-   **Man sollte vor dem Arbeiten an der Schaltung den Kondensator entladen.**
-   Am einfachsten macht man dies mit einer zweiten, ca. 30 cm langen Leitung, mit der man Anode und Kathode des Zählrohrs für etwa eine Sekunde kurzschließt.
-   Dies schützt nicht nur vor unangenehmen Stromschlägen, sondern schützt auch die empfindliche elektronische Schaltung.
 
-
-Optional: I2C Schnittstelle
----------------------------
+Optional: I2C interface
+-----------------------
 
 .. image:: images/build_11.1_I2C_interface.jpg
    :width: 70%
    :align: center
-   :alt: Platinenausschnitt mit Beschriftung der I2C-Schnittstelle
+   :alt: Board section showing I2C pin labels
 
-Optional kann der MultiGeiger über die I2C-Schnittstelle mit zusätzlichen Sensoren ausgestattet werden.
+You can add sensors via the I2C interface.
 
-.. table:: Belegung
+.. table:: Pinout
    :widths: auto
    :align: center
 
    === ======== ===================
-    #   Kürzel   Beschreibung
+    #   Label   Description
    === ======== ===================
-    1   3V3      Spannung 3.3 Volt
-    2   GND      Masse
-    3   SCL      I2C clock
-    4   SDA      I2C data
+    1   3V3     3.3 V supply
+    2   GND     Ground
+    3   SCL     I2C clock
+    4   SDA     I2C data
    === ======== ===================
 
-Aktuell unterstützt werden
+Currently supported:
 
-* `Bosch BME280 <https://www.bosch-sensortec.com/products/environmental-sensors/humidity-sensors-bme280/>`_: Temperatur (°C), relative Luftfeuchtigkeit (%), Luftdruck (Pa)
-* `Bosch BME680 <https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors/bme680/>`_: Temperatur (°C), relative Luftfeuchtigkeit (%), Luftdruck (Pa), Indoor Air Quality (IAQ) Index (25 gut .. 500 schlecht)
+* `Bosch BME280 <https://www.bosch-sensortec.com/products/environmental-sensors/humidity-sensors-bme280/>`_: temperature (C), relative humidity (%), pressure (Pa)
+* `Bosch BME680 <https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors/bme680/>`_: temperature (C), relative humidity (%), pressure (Pa), Indoor Air Quality (IAQ) index (25 good .. 500 poor)
 
-Gehäuse
-#######
+Enclosure
+#########
 
-Funktionen des Gehäuses
------------------------
+Purpose of the enclosure
+------------------------
 
-* Es schützt die Elektronik vor Umwelteinflüssen (z. B. Regen) und Insekten (daher sollte kein Zugang von außen zur Elektronik größer sein als 0,5 mm).
-* Es hält das Zählrohr in einer Höhe von 1 m über der Wiese – somit sind unsere Messwerte (bestmöglich) vergleichbar zu denen des amtlichen `ODL-Messnetzes <https://odlinfo.bfs.de/DE/index.html>`_.
+* Protects electronics from weather (rain) and insects (no openings larger than 0.5 mm).
+* Holds the Geiger tube 1 m above ground so measurements are comparable to the official `ODL network <https://odlinfo.bfs.de/DE/index.html>`_.
 
-Rohre
------
+PVC tubes
+---------
 
 .. image:: images/build_13_pipe.jpg
    :width: 600px
    :align: center
 
-* Rohr für das Elektronikgehäuse: Zunächst wird das Rohr mit einer Säge auf entsprechende Länge abgesägt.
-  Die Muffe (Aufweitung) zeigt nach unten.
-* Rohr für den Erdspieß: Der noch umgesägte Teil des Restes ist das obere Ende des Erdspießes.
-  Unten wird der Erdspieß auf entsprechende Länge abgesägt im 45-Grad-Winkel.
-  Mit diesem schrägen Anschnitt lässt sich der Erdspieß später mit leichten Drehbewegungen gut in die Erde bohren.
-  Alternativ kann man diesen Teil des Rohrs kurzhalten (ca. 15 cm) und in einem verzinkten Sonnenschirmhalter mit Erdspieß (Ø40mm) festklemmen.
-* Lüftungs-/Kabelloch bohren: Mit einem Reißnagel o. ä. wird das Loch seitlich im Erdspieß vorgestochen.
-  Anschließend wird es aufgebohrt. Zuletzt wird es mit einem großen Bohrer / Schälbohrer auf etwa 17 mm Durchmesser aufgebohrt.
+* Electronics tube: cut the tube to length with a saw; the socket (widened end) points downward.
+* Ground spike tube: the remaining piece becomes the top of the ground spike.
+  Cut the bottom at a 45-degree angle to length.
+  The angled tip makes it easier to twist into the ground.
+  Alternatively, keep this piece short (~15 cm) and clamp it into a galvanized parasol ground spike (40 mm inner diameter).
+* Drill the ventilation/cable hole: pre-punch the hole on the side of the ground spike with a push pin, enlarge it, then use a large drill/step drill to about 17 mm diameter.
 
-.. note:: Verletzungsgefahr: Mit der Klinge/dem Bohrer immer nach außen, d. h. vom Körper weg, schneiden oder bohren!
+.. note:: Risk of injury: always cut or drill away from your body.
 
-Dach und Zwischenboden
-----------------------
+Cap and intermediate floor
+--------------------------
 
 .. image:: images/build_14_cap.jpg
    :align: right
    :width: 20%
-   :alt: Deckel
+   :alt: Cap
 
-Für das Dach kann man einen Rohrabschlussstopfen oben vorsichtig über das Rohr schieben, s. Bild rechts.
+A PVC end cap can be slid over the tube as a roof (see photo).
 
 .. image:: images/build_14_bottle_bottom.jpg
    :width: 30%
    :align: left
-   :alt: Zwischenboden
+   :alt: Intermediate floor
 
-Als Zwischenboden verwenden wir eine Kruke, also eine Plastikdose, die in Apotheken zum Abfüllen von Salben verwendet wird.
-Der rote Deckel kann als Material für eine kabeldurchführungsverkleinernde Zwischenbodenauflage dienen.
+We use a small pharmacy jar as the intermediate floor.
+Its red lid can be used as the insert that reduces the cable opening.
 
-Für den Zwischenboden wird lediglich das Gewinde vorsichtig mit der Säge abgesägt, s. Bild links.
-Der „Kragen“ muss bestehen bleiben, da er als Anschlag dient.
+Saw off only the thread of the jar (see photo); keep the collar because it serves as a stop.
 
-In den Zwischenboden wird in der Mitte ein Loch zur Kabeldurchführung mit 10 mm gebohrt.
-Der Stecker des Kabels muss durch das Loch passen.
+Drill a 10 mm hole in the center of the intermediate floor for cable routing.
+The plug of the cable must fit through the hole.
 
-.. Auskommentiert, da die Variante mit Deckel viel einfacher ist
-  Bei Verwendung einer Kruke als Dach wird der „Kragen“ unter dem Gewinde mit abgesägt, so dass die Dachkruke oben genau in das Rohr hineinpasst:
+An intermediate-floor insert keeps insects out by narrowing the cable opening.
+You can use the jar lid or a similar piece of plastic.
 
-  .. image:: images/build_14_bottle_top.jpg
-     :width: 30%
-     :align: left
-     :alt: Deckel zum Einkleben
+Mark the center, drill a hole the size of the power cable (~5 mm), then cut off the corners.
+Add a slit from the outside to the hole.
 
-  Das obere Viertel der Dachkruke wird seitlich mit Silikonklebstoff benetzt und in das obere Teil des Elektronikgehäuses geschoben.
-  Die Fuge wird weiterhin mit Silikonklebstoff abgedichtet.
-
-  Auch der obere Rand der Dachkruke wird mit Klebstoff benetzt (s. Skizze).
-  Um ein Hereinrutschen zu verhindern, kann man sie von unten mit einem langen Gegenstand fixieren.
-  Die Silikonfuge kann man glätten, indem man einen Finger mit Spülmittel benetzt und damit das „Dach“ glättet.
-
-.. Ab hier nicht mehr auskommentiert die Anleitung zur Auflage:
-
-Eine Zwischenbodenauflage dient zum Schutz vor Insekten, da sie das Loch der Kabeldurchführung verkleinert.
-Man kann dafür z. B. den roten Deckel der Kruke oder ein ähnliches Stück Kunststoff verwenden.
-
-Es wird die Mitte markiert und dort ein Loch mit dem Durchmesser des Stromkabels (ca. 5 mm) gebohrt.
-Anschließend werden die Ecken abgeschnitten.
-Zusätzlich wird ein Verbindungsschlitz von außen zum Loch geschnitten.
-
-Aufbau der Zwischenbodenauflage (in zwei Arbeitsschritten):
+Intermediate-floor insert (built in two steps):
 
 .. image:: images/build_15_intermediateFloorSeal.jpg
-   :alt: Aufbau der Zwischenbodenauflage (in zwei Arbeitsschritten)
+   :alt: Intermediate-floor insert in two steps
    :width: 70%
    :align: center
 
-Installationsplatte
--------------------
+Mounting plate
+--------------
 
-* Die Installationsplatte kann aus dem Ober- oder Unterteil eines Kabelkanals gefertigt werden.
-  Dazu werden die Seitenteile vorsichtig mit einem Messer abgeschnitten.
-  Danach wird der dadurch entstandene, biegsame Kunststoffstreifen auf die richtige Länge gebracht.
-  Hierzu kann eine starke Schere verwendet werden.
-* Löcher durch Installationsplatte bohren: Elektronik und Zählrohr werden so mit Kabelbindern auf Installationsplatte fixiert, dass das Zählrohr sich auf 1 m Höhe befindet, wenn der Erdspieß 25 cm in der Erde steckt.
-  Das Zählrohr zeigt nach unten.
-  Die Löcher werden mit dem Reißnagel vorgestochen und dann auf 3 mm aufgebohrt, s. Bild „Bohrplan Installationsplatte“.
-* Die Platine wird lediglich mit einem Kabelbinder auf der Platte montiert, der durch beide Löcher gezogen wird.
-  Er verläuft unterhalb des USB-Steckers.
+* The mounting plate can be made from the top or bottom of a cable duct.
+  Carefully cut off the side walls with a knife.
+  Trim the resulting flexible strip to length using strong scissors.
+* Drill holes through the plate: the electronics and tube are fixed with cable ties so the tube sits at 1 m height when the ground spike is 25 cm in the soil.
+  The tube points downward.
+  Pre-punch the holes with a pin, then drill to 3 mm (see the drilling template).
+* Mount the PCB with a single cable tie through both holes; it runs below the USB connector.
 
-Bohrplan Installationsplatte:
+Drilling template for the mounting plate:
 
 .. image:: images/build_16_installationPlate.jpg
    :width: 500px
    :align: center
-   :alt: Bohrplan Installationsplatte
+   :alt: Mounting plate drilling template
 
-Einbau
-------
+Final assembly
+--------------
 
-Einbau des Geräts (die roten Pfeile markieren Kabelbinder):
+Device assembly (red arrows indicate cable ties):
 
 .. image:: images/build_17_finalAssembly.jpg
    :width: 600px
    :align: center
 
-* Platine und Zählrohr werden mit Kabelbinder auf die Installationsplatte montiert.
-* In die Micro-USB-Buchse wird der passende Adapter gesteckt.
-* Das „10 m Verlängerungskabel“ wird richtig herum zunächst durch den Erdspieß und dann durch den Zwischenboden gefädelt.
-  Anschließend wird er mit dem Adapter verbunden.
-* Danach wird die Zwischenbodenauflage oberhalb des Zwischenbodens vorsichtig auf das Kabel geschoben.
-* Oberhalb der Zwischenbodenauflage wird ein Kabelbinder auf das Kabel gezurrt, so dass eine Zugentlastung entsteht.
-* Erster Test des Gehäuses: Wir schieben erst vorsichtig die Installationsplatte in das Elektronikgehäuse.
-  Anschließend folgen Zwischenboden und der Erdspieß.
-* Wenn alles passt wird noch die Zwischenbodenauflage mit Silikon-Kleber auf den Zwischenboden geklebt und mit Kreppband (bis zum Aushärten) fixiert.
-* Der Warn-Aufkleber „Vorsicht Hochspannung“ wird auf die Installationsplatte geklebt.
+* Fix PCB and tube to the mounting plate with cable ties.
+* Plug the matching adapter into the micro-USB socket.
+* Thread the 10 m extension cable through the ground spike and intermediate floor in the correct direction, then connect it to the adapter.
+* Slide the intermediate-floor insert over the cable above the intermediate floor.
+* Add a cable tie above the insert for strain relief.
+* First test-fit: slide the mounting plate into the electronics tube, then add the intermediate floor and ground spike.
+* If everything fits, glue the intermediate-floor insert onto the intermediate floor with silicone and hold with masking tape until cured.
+* Apply the "High Voltage" warning sticker to the mounting plate.
 
-Inbetriebnahme
-##############
-WLAN-Variante: Das Gerät baut einen eigenen WLAN-Accesspoint (AP) auf.
-Die SSID des AP lautet ESP32-xxxxxxxx, wobei die xxx die Chip-ID des WLAN-Chips sind (Beispiel: ESP32-51564452).
-Bitte diese Nummer notieren, sie wird später für die Anmeldung benötigt, z. B. bei https://devices.sensor.community/.
-Der Access-Point bleibt für 30 s aktiv. Danach versucht das Gerät, sich mit dem (früher) eingestellten WLAN zu verbinden.
-Dieser Verbindungsversuch dauert ebenfalls 30 s. Kommt keine Verbindung zustande, wird wieder der eigene AP für erzeugt.
-Das standardmäßig vergebene WLAN-Kennwort ist „*ESP32Geiger*“ und sollte zeitnah geändert werden.
+Commissioning
+#############
+WiFi variant: the device starts its own WiFi access point (AP).
+The SSID is ``ESP32-xxxxxxxx`` where ``xxxx`` is the WiFi chip ID (example: ``ESP32-51564452``).
+Write down this number; it is needed later for registration (e.g., at https://devices.sensor.community/).
+The AP stays active for 30 s. Then the device tries to connect to the configured WiFi for 30 s.
+If that fails, it returns to AP mode.
+The default WiFi password is ``ESP32Geiger`` and should be changed soon.
 
-Weitere Informationen: :ref:`deployment` und :ref:`usage`.
+More information: :ref:`deployment` and :ref:`usage`.
 
-**Wir wünschen viel Freude mit dem neu gebauten Gerät und hoffen dass es niemals unnatürliche bzw. gesundheitsschädliche Ausschläge messen wird!**
+**Enjoy your new device - and may it never detect dangerous spikes!**
