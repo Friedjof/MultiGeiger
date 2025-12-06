@@ -340,7 +340,7 @@ int send_http_thp_2_madavi(HttpsClient *client, float temperature, float humidit
 // To minimise airtime and follow the 'TTN Fair Access Policy', we send all data in one message.
 // We do NOT use Cayenne LPP.
 // The payload will be translated via http integration and a small program to be compatible with sensor.community.
-// For byte definitions see ttn2luft.pdf in docs directory.
+// For byte definitions see docs/source/ttn_payload.rst.
 //
 // Combined payload structure (18 bytes total):
 // Bytes 0-3:   GM counts (uint32_t)

@@ -18,12 +18,13 @@ MultiGeiger Documentation
    assembly
    setup
    setup_lora
+   ttn_payload
    usage
    mqtt
    deployment
+   cicd
    faq
    resources
    changes
    development
    authors
-
