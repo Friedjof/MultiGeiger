@@ -193,7 +193,7 @@ V1.13.0 2020-04-14
 * docs:
 
   - added upgrade hints for 1.13 in README on github
-  - https://multigeiger.readthedocs.io/ == the beginning of
+  - https://multigeiger-v2.readthedocs.io/ == the beginning of
     new (sphinx / reST-markup based) online docs, #163
   - add a basic, short README in English (also for online docs)
   - include infos about project name, #121

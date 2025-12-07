@@ -310,7 +310,7 @@ msgstr ""
 
 #: ../../source/changes.rst:106 5d5826cc20d6464691027077f0299585
 msgid ""
-"https://multigeiger.readthedocs.io/ == the beginning of new (sphinx / reST-"
+"https://multigeiger-v2.readthedocs.io/ == the beginning of new (sphinx / reST-"
 "markup based) online docs, #163"
 msgstr ""
 
