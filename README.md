@@ -1,6 +1,6 @@
 # MultiGeiger 🛰️
 
-[![Build Status](https://github.com/Ecocurious2/MultiGeiger/actions/workflows/build.yml/badge.svg)](https://github.com/Ecocurious2/MultiGeiger/actions/workflows/build.yml)
+[![Build Status](https://github.com/Friedjof/MultiGeiger/actions/workflows/build.yml/badge.svg)](https://github.com/Friedjof/MultiGeiger/actions/workflows/build.yml)
 [![Documentation Status](https://readthedocs.org/projects/multigeiger/badge/?version=latest)](https://multigeiger.readthedocs.org/)
 
 The MultiGeiger is an **ESP32-based radioactivity measurement device** designed for citizen science projects. It features a modern web interface, multiple connectivity options (WiFi, LoRa, BLE), and environmental sensors for comprehensive environmental monitoring.
@@ -365,7 +365,7 @@ Generated docs: `docs/build/html/index.html`
 
 - 🌍 **Live Radiation Map**: https://multigeiger.citysensor.de/ - Real-time data from deployed sensors
 - 🏗️ **Ecocurious Project Page**: https://ecocurious.de/projekte/multigeiger-2/ (German)
-- 🎥 **Video Tutorials**: https://play.wa.binary-kitchen.de/_/global/raw.githubusercontent.com/ecocurious2/rc3_2020/main/main.json (German)
+- 🎥 **Video Tutorials**: https://play.wa.binary-kitchen.de/_/global/raw.githubusercontent.com/Friedjof/rc3_2020/main/main.json (German)
 - 💬 **Discussion & Support**: GitHub Issues and Discussions
 
 ## 🤝 Contributing

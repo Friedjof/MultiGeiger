@@ -24,7 +24,7 @@ This builds a citizen-operated radiation monitoring network. You are warmly invi
 Parts
 #####
 
-Sort the electronics parts first (see the `bill of materials <https://github.com/ecocurious2/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_) and check for completeness.
+Sort the electronics parts first (see the `bill of materials <https://github.com/Friedjof/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_) and check for completeness.
 
 .. |parts01| image:: images/build_02_parts_01.jpg
    :width: 100px

@@ -51,11 +51,11 @@ msgstr "Bauteile"
 #: ../../source/assembly.rst:27 005b05c65c214cc0b7f47950a7a13eac
 msgid ""
 "Elektronikbauteile aus (s. `Stückliste "
-"<https://github.com/ecocurious2/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_)"
+"<https://github.com/Friedjof/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_)"
 " zunächst sortieren und auf Vollständigkeit prüfen:"
 msgstr ""
 "Elektronikbauteile aus (s. `Stückliste "
-"<https://github.com/ecocurious2/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_)"
+"<https://github.com/Friedjof/MultiGeiger/blob/master/docs/hardware/MultiGeiger_Partlist.ods?raw=true>`_)"
 " zunächst sortieren und auf Vollständigkeit prüfen:"
 
 #: ../../source/assembly.rst:81 ebc8cb1056a74e7aaf3b0ddc00da8d7c
