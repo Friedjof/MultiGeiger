@@ -3,32 +3,26 @@
 Changelog
 =========
 
-V1.18.0-dev 2025-xx-xx
+V1.18.0-dev 2025-12-07
 ----------------------
 
 New features:
 
-* **WiFi Captive Portal**: Automatic redirection to configuration page when connecting to AP
-* **Always-on AP Mode**: AP now opens for 30 seconds on every boot, regardless of WiFi configuration
-* **Persistent AP Mode**: AP remains open indefinitely when a client is connected
-* **MQTT Support**: Proof-of-concept MQTT publishing functionality with TLS support
-
-Improvements:
-
-* **Immediate Settings Application**: LED, speaker, and display settings are now applied immediately after saving, without requiring a reboot
-* **Improved WiFi Flow**: Automatic STA reconnection after AP client disconnect (if WiFi credentials configured)
-* **WiFi Timeout**: Increased STA connection timeout to 20 seconds
+* **MQTT publishing** with optional TLS and configurable base topic
+* **Updated LoRaWAN/TTN uplink**: combined 18-byte payload with GM + THP + gas data, sensor type tagging, and JavaScript decoder
 
 Fixes:
 
-* Fixed LED continuing to blink after being disabled in web configuration
-* Fixed display not updating after being re-enabled in web configuration
+* CI builds now auto-create ``src/config/config.hpp`` (no missing-config build failures)
+* Read the Docs build fixed by specifying OS/Python and installing ``docs/requirements.txt``
 
 Other changes:
 
-* Refactored WiFi event handling with separate connect/disconnect handlers
-* Added controller methods for runtime settings updates
-* Global controller instance for configuration callbacks
+* Added support for BMP280/BME280/BME680 (temperature/pressure/humidity/gas) and gas resistance reporting
+* LoRa payload handling consolidated into ``send_ttn_combined``; legacy THP uplink deprecated
+* Documentation cleanup: TTN payload moved to Sphinx (``ttn_payload.rst``), CI/CD docs added, legacy PDF/MD removed
+* Workflows split into ``build`` (push/PR) and ``release`` (tags); new helper ``tools/prepare_config.sh``
+* Maintainer contact: friedjof@noweck.info
 
 ----------------------
 
@@ -344,4 +338,3 @@ V0.1 2019-03-25 jb
 ------------------
 
 * first version for ESP32 board
-
