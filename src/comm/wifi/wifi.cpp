@@ -525,6 +525,12 @@ char appskey[IOTWEBCONF_WORD_LEN] = "";  // Application Session Key (32 hex char
 float localAlarmThreshold = LOCAL_ALARM_THRESHOLD;
 int localAlarmFactor = (int)LOCAL_ALARM_FACTOR;
 
+// HTTP Basic Auth credentials for /config and /api/config
+#define HTTP_AUTH_USER_LEN IOTWEBCONF_WORD_LEN
+#define HTTP_AUTH_PASS_LEN IOTWEBCONF_WORD_LEN
+char httpAuthUser[HTTP_AUTH_USER_LEN] = HTTP_AUTH_USER;
+char httpAuthPass[HTTP_AUTH_PASS_LEN] = HTTP_AUTH_PASS;
+
 iotwebconf::ParameterGroup grpMisc = iotwebconf::ParameterGroup("misc", "Misc. Settings");
 iotwebconf::CheckboxParameter startSoundParam = iotwebconf::CheckboxParameter("Start sound", "startSound", playSound_c, CHECKBOX_LEN, playSound);
 iotwebconf::CheckboxParameter speakerTickParam = iotwebconf::CheckboxParameter("Speaker tick", "speakerTick", speakerTick_c, CHECKBOX_LEN, speakerTick);
@@ -572,6 +578,10 @@ iotwebconf::IntTParameter<int16_t> localAlarmFactorParam =
   min(2).max(100).
   step(1).placeholder("2..100").build();
 
+iotwebconf::ParameterGroup grpAuth = iotwebconf::ParameterGroup("auth", "HTTP Authentication");
+iotwebconf::TextParameter httpAuthUserParam = iotwebconf::TextParameter("Config username", "httpAuthUser", httpAuthUser, HTTP_AUTH_USER_LEN);
+iotwebconf::PasswordParameter httpAuthPassParam = iotwebconf::PasswordParameter("Config password", "httpAuthPass", httpAuthPass, HTTP_AUTH_PASS_LEN);
+
 DNSServer dnsServer;
 WebServer server(80);
 HTTPUpdateServer httpUpdater;
@@ -605,6 +615,23 @@ char *buildSSID() {
   uint32_t id = getESPchipID();
   sprintf(ssid, "MultiGeiger-%06X", id & 0xFFFFFF);
   return ssid;
+}
+
+/**
+ * @brief Check HTTP Basic Authentication for protected endpoints
+ * @return true if authenticated, false otherwise (sends 401 response)
+ */
+bool checkHttpAuth(void) {
+  // Skip auth when in AP mode - WiFi password is sufficient authentication
+  if (iotWebConf.getState() == iotwebconf::ApMode || iotWebConf.getState() == iotwebconf::Boot) {
+    return true;
+  }
+
+  if (!server.authenticate(httpAuthUser, httpAuthPass)) {
+    server.requestAuthentication(BASIC_AUTH, "MultiGeiger Config", "Authentication required");
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -656,6 +683,11 @@ void handleRoot(void) {  // Handle web requests to "/" path.
 }
 
 void handleConfigPage(void) {
+  // Check authentication
+  if (!checkHttpAuth()) {
+    return;  // Auth failed, 401 response already sent
+  }
+
   // Disable ticking while accessing the config page to avoid exceptions
   // when accessing flash memory (firmware update or config save).
   // Ticks will be re-enabled when config is saved (see configSaved()) or
@@ -669,6 +701,11 @@ void handleConfigPage(void) {
 }
 
 void handleConfigPing(void) {
+  // Check authentication
+  if (!checkHttpAuth()) {
+    return;  // Auth failed, 401 response already sent
+  }
+
   // Update heartbeat timestamp
   lastConfigPingTime = millis();
   server.send(200, "application/json", "{\"status\":\"ok\"}");
@@ -753,6 +790,10 @@ void loadConfigVariables(void) {
   mqttPassword[MQTT_PASS_LEN - 1] = '\0';
   strncpy(mqttBaseTopic, mqttBaseTopicParam.valueBuffer, MQTT_BASE_TOPIC_LEN);
   mqttBaseTopic[MQTT_BASE_TOPIC_LEN - 1] = '\0';
+  strncpy(httpAuthUser, httpAuthUserParam.valueBuffer, HTTP_AUTH_USER_LEN);
+  httpAuthUser[HTTP_AUTH_USER_LEN - 1] = '\0';
+  strncpy(httpAuthPass, httpAuthPassParam.valueBuffer, HTTP_AUTH_PASS_LEN);
+  httpAuthPass[HTTP_AUTH_PASS_LEN - 1] = '\0';
 }
 
 void configSaved(void) {
@@ -766,6 +807,11 @@ void configSaved(void) {
 }
 
 void handleGetConfig(void) {
+  // Check authentication
+  if (!checkHttpAuth()) {
+    return;  // Auth failed, 401 response already sent
+  }
+
   String json = "{";
 
   // WiFi settings
@@ -815,6 +861,11 @@ void handleGetConfig(void) {
 }
 
 void handlePostConfig(void) {
+  // Check authentication
+  if (!checkHttpAuth()) {
+    return;  // Auth failed, 401 response already sent
+  }
+
   if (!server.hasArg("plain")) {
     server.send(400, "text/plain", "Body not received");
     return;
@@ -1066,6 +1117,9 @@ void setup_webconf(bool loraHardware) {
   grpAlarm.addItem(&localAlarmThresholdParam);
   grpAlarm.addItem(&localAlarmFactorParam);
   iotWebConf.addParameterGroup(&grpAlarm);
+  grpAuth.addItem(&httpAuthUserParam);
+  grpAuth.addItem(&httpAuthPassParam);
+  iotWebConf.addParameterGroup(&grpAuth);
 
   // if we don't have LoRa hardware, do not send to LoRa
   if (!isLoraBoard)
@@ -1073,6 +1127,9 @@ void setup_webconf(bool loraHardware) {
 
   iotWebConf.init();
   loadConfigVariables();
+
+  // Set HTTP updater credentials to match our HTTP auth
+  httpUpdater.updateCredentials(httpAuthUser, httpAuthPass);
 
   // Ensure AP password is set; otherwise library forces permanent AP mode.
   if (iotWebConf.getApPasswordParameter()->valueBuffer[0] == '\0') {
@@ -1097,8 +1154,8 @@ void setup_webconf(bool loraHardware) {
   (void)apDisconnectEventId;
 
   auto redirectToCaptivePortal = []() {
-    log(INFO, "Captive portal probe detected, redirecting to /config");
-    server.sendHeader("Location", "/config");
+    log(INFO, "Captive portal probe detected, redirecting to dashboard");
+    server.sendHeader("Location", "/");
     server.send(302, "text/plain", "");
   };
 
@@ -1114,12 +1171,14 @@ void setup_webconf(bool loraHardware) {
     serveCompressed(server, app_js_gz, app_js_gz_len, "application/javascript");
   });
 
-  // Serve config page and assets
+  // Serve config page and assets (all protected with auth)
   server.on("/config.html", handleConfigPage);
   server.on("/config-style.css", []() {
+    if (!checkHttpAuth()) return;
     serveCompressed(server, config_style_css_gz, config_style_css_gz_len, "text/css");
   });
   server.on("/config.js", []() {
+    if (!checkHttpAuth()) return;
     serveCompressed(server, config_js_gz, config_js_gz_len, "application/javascript");
   });
 
@@ -1134,7 +1193,10 @@ void setup_webconf(bool loraHardware) {
   server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
   server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
   server.on("/config", handleConfigPage);
-  server.on("/firmware", [] { iotWebConf.handleConfig(); });  // Keep IotWebConf for firmware update
+  server.on("/firmware", [] {
+    if (!checkHttpAuth()) return;
+    iotWebConf.handleConfig();
+  });  // OTA firmware update (protected)
   server.onNotFound([]() {
     // Quietly redirect captive-portal probes (e.g. connectivitycheck.gstatic.com) to root
     if (iotWebConf.handleCaptivePortal()) {

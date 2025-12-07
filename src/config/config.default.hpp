@@ -101,7 +101,12 @@
 #define SENSORCOMMUNITY_URL "http://api.sensor.community/v1/push-sensor-data/"
 #define CUSTOMSRV_URL "https://ptsv2.com/t/xxxxx-yyyyyyyyyy/post"
 #define SEND2CUSTOMSRV false
-#define CONFIG_VERSION "017"
+#define CONFIG_VERSION "016"
+
+// HTTP Basic Auth for /config and /api/config endpoints
+// Default credentials for initial setup (should be changed via web UI)
+#define HTTP_AUTH_USER "admin"
+#define HTTP_AUTH_PASS "admin"
 
 // Web config checkboxes have 'selected' if checked, so we need 9 byte for this string.
 #define CHECKBOX_LEN 9
