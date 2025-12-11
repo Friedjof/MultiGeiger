@@ -15,6 +15,9 @@ void setup_clock(time_t timestamp);
 // return a iso-8601-like utc timestamp
 char *utctime(void);
 
+// return a iso-8601-like local timestamp
+char *localtime_str(void);
+
 // Thin OO wrapper for clock handling.
 class ClockModule {
 public:

@@ -37,6 +37,7 @@
           </div>
           <div class="panel-toggle">
             <button class="toggle-btn active" data-target="dashboard">Dashboard</button>
+            <button class="toggle-btn" data-target="status">Status</button>
             <button class="toggle-btn" data-target="settings">Settings</button>
           </div>
         </div>
@@ -87,6 +88,127 @@
           </div>
         </section>
 
+        <section id="panel-status" data-panel="status" hidden>
+          <div class="status-grid">
+            <div class="card status-tile" id="tile-wifi">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">📶</span>
+                  <span class="tile-title">WiFi</span>
+                </div>
+                <span class="tile-status" id="wifi-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="wifi-info">Not connected</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-mqtt">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">🔗</span>
+                  <span class="tile-title">MQTT</span>
+                </div>
+                <span class="tile-status" id="mqtt-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="mqtt-info">Not configured</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-lora">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">📡</span>
+                  <span class="tile-title">LoRa/TTN</span>
+                </div>
+                <span class="tile-status" id="lora-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="lora-info">Not configured</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-community">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">🌍</span>
+                  <span class="tile-title">sensor.community</span>
+                </div>
+                <span class="tile-status" id="community-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="community-info">Disabled</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-madavi">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">📊</span>
+                  <span class="tile-title">madavi.de</span>
+                </div>
+                <span class="tile-status" id="madavi-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="madavi-info">Disabled</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-ble">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">📲</span>
+                  <span class="tile-title">Bluetooth</span>
+                </div>
+                <span class="tile-status" id="ble-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="ble-info">Disabled</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-sensor">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">🌡️</span>
+                  <span class="tile-title">Sensors</span>
+                </div>
+                <span class="tile-status" id="sensor-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="sensor-info">No sensor detected</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-display">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">🖥️</span>
+                  <span class="tile-title">Display</span>
+                </div>
+                <span class="tile-status" id="display-status">inactive</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="display-info">Status unknown</div>
+              </div>
+            </div>
+
+            <div class="card status-tile" id="tile-ota">
+              <div class="tile-header">
+                <div class="tile-top">
+                  <span class="tile-icon">⬆️</span>
+                  <span class="tile-title">OTA Updates</span>
+                </div>
+                <span class="tile-status" id="ota-status">active</span>
+              </div>
+              <div class="tile-body">
+                <div class="tile-info" id="ota-info">Ready</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="panel-settings" data-panel="settings" hidden>
           <div class="card section-card">
             <div class="section-header">
@@ -130,21 +252,25 @@
               <details class="accordion">
                 <summary>Device</summary>
                 <div class="accordion-body">
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="startSound" name="startSound" />
-                    <span>Start sound</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Start sound</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="speakerTick" name="speakerTick" />
-                    <span>Speaker tick</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Speaker tick</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="ledTick" name="ledTick" />
-                    <span>LED tick</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">LED tick</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="showDisplay" name="showDisplay" />
-                    <span>Show display</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Show display</span>
                   </label>
                 </div>
               </details>
@@ -152,17 +278,20 @@
               <details class="accordion">
                 <summary>Transmission</summary>
                 <div class="accordion-body">
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="sendToCommunity" name="sendToCommunity" />
-                    <span>Send to sensor.community</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Send to sensor.community</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="sendToMadavi" name="sendToMadavi" />
-                    <span>Send to madavi.de</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Send to madavi.de</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="sendToBle" name="sendToBle" />
-                    <span>Send via BLE</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Send via BLE</span>
                   </label>
                 </div>
               </details>
@@ -170,9 +299,10 @@
               <details class="accordion">
                 <summary>MQTT</summary>
                 <div class="accordion-body">
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="sendToMqtt" name="sendToMqtt" />
-                    <span>Enable MQTT</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Enable MQTT</span>
                   </label>
                   <label class="field">
                     <span>Broker</span>
@@ -182,13 +312,15 @@
                     <span>Port</span>
                     <input id="mqttPort" name="mqttPort" type="number" min="1" max="65535" placeholder="1883" />
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="mqttUseTls" name="mqttUseTls" />
-                    <span>Use TLS (insecure PoC)</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Use TLS (insecure PoC)</span>
                   </label>
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="mqttRetain" name="mqttRetain" />
-                    <span>Retain MQTT messages</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Retain MQTT messages</span>
                   </label>
                   <label class="field">
                     <span>Username</span>
@@ -208,9 +340,10 @@
               <details class="accordion hidden" id="loraGroup">
                 <summary>LoRa / TTN</summary>
                 <div class="accordion-body">
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="sendToLora" name="sendToLora" />
-                    <span>Send to LoRa/TTN</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Send to LoRa/TTN</span>
                   </label>
                   <label class="field">
                     <span>DevAddr</span>
@@ -230,9 +363,10 @@
               <details class="accordion">
                 <summary>Alarm</summary>
                 <div class="accordion-body">
-                  <label class="checkbox">
+                  <label class="toggle">
                     <input type="checkbox" id="soundLocalAlarm" name="soundLocalAlarm" />
-                    <span>Enable local alarm</span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">Enable local alarm</span>
                   </label>
                   <label class="field">
                     <span>Threshold (µSv/h)</span>

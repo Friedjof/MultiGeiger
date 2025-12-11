@@ -149,6 +149,12 @@ static bool configPageActive = false;
 static unsigned long lastConfigPingTime = 0;
 static const unsigned long CONFIG_PING_TIMEOUT_MS = 5000;  // 5 seconds
 
+// Timestamps for last successful transmissions (milliseconds since boot)
+static unsigned long lastMqttPublishTime = 0;
+static unsigned long lastLoRaSendTime = 0;
+static unsigned long lastCommunitySendTime = 0;
+static unsigned long lastMadaviSendTime = 0;
+
 typedef struct https_client {
   WiFiClientSecure *wc;
   HTTPClient *hc;
@@ -456,6 +462,9 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     madavi_ok = (rc1 == 200) && (rc2 == 200);
     log(INFO, "Sent to Madavi, status: %s, http: %d %d", madavi_ok ? "ok" : "error", rc1, rc2);
     set_status(STATUS_MADAVI, madavi_ok ? ST_MADAVI_IDLE : ST_MADAVI_ERROR);
+    if (madavi_ok) {
+      lastMadaviSendTime = millis();
+    }
     display_status();
   }
 
@@ -470,6 +479,9 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     scomm_ok = (rc1 == 201) && (rc2 == 201);
     log(INFO, "Sent to sensor.community, status: %s, http: %d %d", scomm_ok ? "ok" : "error", rc1, rc2);
     set_status(STATUS_SCOMM, scomm_ok ? ST_SCOMM_IDLE : ST_SCOMM_ERROR);
+    if (scomm_ok) {
+      lastCommunitySendTime = millis();
+    }
     display_status();
   }
 
@@ -485,6 +497,9 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     ttn_ok = (rc1 == TX_STATUS_UPLINK_SUCCESS);
     log(INFO, "TTN transmission %s (rc=%d)", ttn_ok ? "SUCCESS" : "FAILED", rc1);
     set_status(STATUS_TTN, ttn_ok ? ST_TTN_IDLE : ST_TTN_ERROR);
+    if (ttn_ok) {
+      lastLoRaSendTime = millis();
+    }
     display_status();
   } else {
     // Log why LoRa is not sending
@@ -663,15 +678,88 @@ bool validateHexString(const String &input, size_t expectedLen) {
 }
 
 /**
+ * @brief Check and sync time from X-Client-Time header if device time is invalid
+ *
+ * Call this at the start of every request handler.
+ * Automatically sets device time from browser if current time < 2020.
+ */
+void checkAndSyncClientTime(void) {
+  const time_t YEAR_2020 = 1577836800;  // 2020-01-01 00:00:00 UTC
+  static bool time_synced = false;
+
+  time_t now = time(nullptr);
+
+  // If time is already valid, skip
+  if (now >= YEAR_2020) {
+    time_synced = true;
+    return;
+  }
+
+  // Get X-Client-Time header
+  String clientTimeHeader = server.header("X-Client-Time");
+  if (clientTimeHeader.length() == 0) {
+    return;  // No client time available
+  }
+
+  // Parse client time (milliseconds)
+  unsigned long long client_time_ms = strtoull(clientTimeHeader.c_str(), nullptr, 10);
+  if (client_time_ms < 1000000000000ULL) {  // Sanity check: must be > year 2001
+    return;
+  }
+
+  time_t new_time = (time_t)(client_time_ms / 1000ULL);
+
+  // Validate time is reasonable
+  if (new_time < YEAR_2020) {
+    return;
+  }
+
+  // Set system time
+  struct timeval tv = {new_time, 0};
+  settimeofday(&tv, nullptr);
+
+  struct tm local_tm;
+  localtime_r(&new_time, &local_tm);
+  char time_str[20];
+  strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &local_tm);
+
+  log(INFO, "Time auto-synced from browser - New time: %s", time_str);
+  time_synced = true;
+}
+
+/**
  * @brief API endpoint for live status data (JSON)
  */
 void handleApiStatus(void) {
+  // Auto-sync time from browser if needed
+  checkAndSyncClientTime();
+
   unsigned long counts = controller.getCounts();
   float temp = controller.getTemperature();
   float hum = controller.getHumidity();
   float press = controller.getPressure();
+  float gas = controller.getGasResistance();
   bool thp = controller.hasThp();
   bool hvErr = controller.hasHvError();
+  int sensorType = controller.getSensorType();
+
+  const char* sensorName = nullptr;
+  switch (sensorType) {
+    case 680:
+      sensorName = "BME680";
+      break;
+    case 2280:
+      sensorName = "BME280";
+      break;
+    case 280:
+      sensorName = "BMP280";
+      break;
+    default:
+      break;
+  }
+
+  bool hasHumidity = (sensorType == 2280 || sensorType == 680);
+  bool hasGas = (sensorType == 680);
 
   // Calculate CPM and dose rate (simplified calculation)
   unsigned long uptime_ms = millis();
@@ -684,15 +772,119 @@ void handleApiStatus(void) {
   json += "\"cpm\":" + String(cpm, 1) + ",";
   json += "\"dose_uSvh\":" + String(dose_rate, 3) + ",";
   json += "\"uptime_s\":" + String(uptime_s) + ",";
-  json += "\"hv_error\":" + String(hvErr ? "true" : "false") + ",";
+  json += "\"hv_error\":" + String(hvErr ? "true" : "false");
 
-  if (thp) {
-    json += "\"temperature\":" + String(temp, 1) + ",";
-    json += "\"humidity\":" + String(hum, 1) + ",";
-    json += "\"pressure\":" + String(press, 1) + ",";
+  if (sensorName != nullptr) {
+    json += ",\"sensor\":\"" + String(sensorName) + "\"";
   }
 
-  json += "\"has_thp\":" + String(thp ? "true" : "false");
+  if (thp) {
+    json += ",\"temperature\":" + String(temp, 1);
+    json += ",\"pressure\":" + String(press, 1);
+    if (hasHumidity) {
+      json += ",\"humidity\":" + String(hum, 1);
+    }
+    if (hasGas) {
+      json += ",\"gas\":" + String(gas, 0);
+    }
+  }
+
+  json += ",\"has_thp\":" + String(thp ? "true" : "false");
+
+  // WiFi status
+  WiFiState wifiState = wifiService.getState();
+  bool isAP = (wifiState == WIFI_STATE_AP_MODE);
+  bool isOnline = (wifiState == WIFI_STATE_ONLINE);
+
+  json += ",\"wifi_mode\":\"" + String(isAP ? "AP" : "STA") + "\"";
+  json += ",\"wifi_connected\":" + String((isOnline || isAP) ? "true" : "false");
+
+  if (isAP) {
+    // In AP mode, show device name as SSID
+    json += ",\"wifi_ssid\":\"" + String(wifiService.getHostname()) + "\"";
+    json += ",\"wifi_ip\":\"" + WiFi.softAPIP().toString() + "\"";
+  } else if (isOnline) {
+    // In STA mode, show connected SSID and signal strength
+    json += ",\"wifi_ssid\":\"" + WiFi.SSID() + "\"";
+    json += ",\"wifi_ip\":\"" + WiFi.localIP().toString() + "\"";
+    json += ",\"wifi_rssi\":" + String(WiFi.RSSI());
+  }
+
+  // MQTT status
+  unsigned long mqttLastPublish = controller.getMqtt().getLastPublishTime();
+  json += ",\"mqtt_enabled\":" + String(configService.getConfig().sendToMqtt ? "true" : "false");
+  json += ",\"mqtt_connected\":" + String((mqttLastPublish > 0) ? "true" : "false");
+  if (mqttLastPublish > 0) {
+    json += ",\"mqtt_last_publish\":" + String(mqttLastPublish);
+  }
+
+  // LoRa status
+  if (lastLoRaSendTime > 0) {
+    json += ",\"lora_enabled\":true";
+    json += ",\"lora_last_send\":" + String(lastLoRaSendTime);
+  } else {
+    json += ",\"lora_enabled\":" + String(configService.getConfig().sendToLora ? "true" : "false");
+  }
+
+  // sensor.community status
+  if (lastCommunitySendTime > 0) {
+    json += ",\"community_enabled\":true";
+    json += ",\"community_last_send\":" + String(lastCommunitySendTime);
+  } else {
+    json += ",\"community_enabled\":" + String(configService.getConfig().sendToCommunity ? "true" : "false");
+  }
+
+  // madavi.de status
+  if (lastMadaviSendTime > 0) {
+    json += ",\"madavi_enabled\":true";
+    json += ",\"madavi_last_send\":" + String(lastMadaviSendTime);
+  } else {
+    json += ",\"madavi_enabled\":" + String(configService.getConfig().sendToMadavi ? "true" : "false");
+  }
+
+  // BLE status
+  int bleConnections = controller.getBle().getConnectedCount();
+  json += ",\"ble_enabled\":" + String(configService.getConfig().sendToBle ? "true" : "false");
+  json += ",\"ble_connections\":" + String(bleConnections);
+
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+/**
+ * @brief API endpoint for current device time (JSON)
+ *
+ * Provides the current epoch in milliseconds and timezone offset in minutes.
+ * Offset uses localtime offset (e.g. Berlin CET/CEST).
+ */
+void handleApiTime(void) {
+  // Auto-sync time from browser if needed
+  checkAndSyncClientTime();
+
+  time_t now = time(nullptr);
+  struct tm local_tm;
+  struct tm utc_tm;
+  localtime_r(&now, &local_tm);
+  gmtime_r(&now, &utc_tm);
+
+  // Calculate offset between local time and UTC in seconds
+  time_t local_epoch = mktime(&local_tm);
+  time_t utc_epoch = mktime(&utc_tm);
+  long offset_sec = static_cast<long>(difftime(local_epoch, utc_epoch));
+  long offset_min = offset_sec / 60;
+
+  unsigned long long epoch_ms = static_cast<unsigned long long>(now) * 1000ULL;
+
+  // Log time sync request with local time
+  char local_time_str[20];
+  strftime(local_time_str, sizeof(local_time_str), "%Y-%m-%d %H:%M:%S", &local_tm);
+  log(INFO, "Time sync request - Local: %s, Offset: %+d min, Epoch: %llu ms",
+      local_time_str, offset_min, epoch_ms);
+
+  String json = "{";
+  json += "\"epoch_ms\":" + String(epoch_ms) + ",";
+  json += "\"tz_offset_min\":" + String(offset_min);
   json += "}";
 
   server.send(200, "application/json", json);
@@ -1179,6 +1371,9 @@ void setup_webconf(bool loraHardware) {
     server.send(302, "text/plain", "");
   };
 
+  // Enable CORS for API endpoints
+  server.enableCORS(true);
+
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
   server.on("/index.html", handleRoot);
@@ -1190,6 +1385,9 @@ void setup_webconf(bool loraHardware) {
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/config", HTTP_POST, handlePostConfig);
   server.on("/api/config/ping", HTTP_POST, handleConfigPing);
+
+  // Time API endpoint
+  server.on("/api/time", HTTP_GET, handleApiTime);
 
   // Captive portal probes (Android/Windows/Apple) - redirect to config page
   server.on("/generate_204", HTTP_ANY, redirectToCaptivePortal);      // Android
@@ -1236,13 +1434,25 @@ void setup_webconf(bool loraHardware) {
 
   server.onNotFound([]() {
     const String path = server.uri();
+
+    // Common browser requests that we can silently ignore
+    if (path == "/favicon.ico" || path == "/robots.txt" || path == "/sitemap.xml") {
+      server.send(404, "text/plain", "");
+      return;
+    }
+
+    // Try to serve web asset
     if (sendWebAsset(path)) {
       return;
     }
+
     // SPA fallback
     if (sendWebAsset("/index.html")) {
       return;
     }
+
+    // Log unhandled requests for debugging
+    log(WARNING, "Unhandled request: %s %s", server.method() == HTTP_GET ? "GET" : "POST", path.c_str());
     server.send(404, "text/plain", "Not found");
   });
 

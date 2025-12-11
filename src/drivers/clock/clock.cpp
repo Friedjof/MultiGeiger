@@ -27,6 +27,19 @@ char *utctime(void) {
 }
 
 
+char *localtime_str(void) {
+  // return a pointer to a local timestamp string like 2019-12-31T23:59:59
+  time_t t;
+  struct tm *ti;
+  static char buffer[20];
+
+  time(&t);
+  ti = localtime(&t);
+  strftime(buffer, 20, "%Y-%m-%dT%H:%M:%S", ti);
+  return buffer;
+}
+
+
 void setup_clock(time_t timestamp) {
   config_time(timestamp);
 }

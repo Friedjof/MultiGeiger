@@ -8,6 +8,11 @@ const BASE_STATUS = {
   pressure: 1014.2,
   sensor: 'BME280',
   version: 'v1.0.0-mock',
+  wifi_connected: true,
+  wifi_mode: 'STA', // 'AP' or 'STA'
+  wifi_ssid: 'MyNetwork',
+  wifi_ip: '192.168.1.42',
+  wifi_rssi: -65,
 };
 
 const DEFAULT_CONFIG = {
@@ -79,13 +84,49 @@ export class MockAPI {
     const cpm = this.cps * 60;
     const dose = cpm * 0.0029;
     await sleep();
+
+    // Mock timestamps for last send times (3 minutes ago)
+    const recentTimestamp = Date.now() - 180000;
+
+    // Determine WiFi mode - use AP mode if no client SSID configured
+    const wifiMode = this.config.wifiSsid ? 'STA' : 'AP';
+    const isAPMode = wifiMode === 'AP';
+
     return {
       ...this.status,
       counts,
       cpm: Number(cpm.toFixed(1)),
       dose_uSvh: Number(dose.toFixed(3)),
       uptime_s: elapsed,
+      wifi_mode: wifiMode,
+      wifi_ssid: isAPMode ? this.config.thingName : this.config.wifiSsid,
+      mqtt_enabled: this.config.sendToMqtt,
+      mqtt_connected: this.config.sendToMqtt && !isAPMode,
+      mqtt_last_publish: (this.config.sendToMqtt && !isAPMode) ? recentTimestamp : null,
+      lora_enabled: this.config.sendToLora,
+      lora_last_send: this.config.sendToLora ? recentTimestamp : null,
+      community_enabled: this.config.sendToCommunity,
+      community_last_send: (this.config.sendToCommunity && !isAPMode) ? recentTimestamp : null,
+      madavi_enabled: this.config.sendToMadavi,
+      madavi_last_send: (this.config.sendToMadavi && !isAPMode) ? recentTimestamp : null,
+      ble_enabled: this.config.sendToBle,
+      ble_connections: this.config.sendToBle ? 0 : 0,
     };
+  }
+
+  async getTime() {
+    await sleep(50);
+    return {
+      epoch_ms: Date.now(),
+      tz_offset_min: 0,
+    };
+  }
+
+  async setTime(data) {
+    await sleep(50);
+    // In mock, we don't actually set time, just acknowledge
+    console.log('Mock API: Time set request received', data);
+    return { status: 'ok', epoch_ms: data.epoch_ms };
   }
 
   async getConfig() {

@@ -20,6 +20,8 @@ build-web:
 web: build-web
 
 build: build-web
+	@echo "Injecting version from VERSION file..."
+	@$(PYTHON) scripts/inject_version.py
 	@$(PIO) run -e $(ENV)
 
 flash: build
@@ -60,16 +62,16 @@ $(DOCS_STAMP): docs/requirements.txt $(VENV)/bin/python
 	@touch $(DOCS_STAMP)
 
 release:
-ifndef VERSION
-	@echo "Error: VERSION is required. Usage: make release VERSION=vX.Y.Z"
+ifndef v
+	@echo "Error: version required. Usage: make release v=X.Y.Z"
 	@exit 1
 endif
-	@echo "Creating release $(VERSION)..."
-	@echo "// $(VERSION)" > VERSION
-	@echo "Version file updated to $(VERSION)"
+	@echo "Creating release v$(v)..."
+	@echo "// v$(v)" > VERSION
+	@echo "Version file updated to v$(v)"
 	@$(MAKE) build-web
 	@git add VERSION $(WEB_ASSETS)
-	@git commit -m "Release $(VERSION)"
-	@git tag $(VERSION)
-	@echo "Release $(VERSION) created successfully!"
+	@git commit -m "Release v$(v)"
+	@git tag v$(v)
+	@echo "Release v$(v) created successfully!"
 	@echo "To push: git push && git push --tags"

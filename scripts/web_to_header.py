@@ -44,7 +44,12 @@ def collect_files(root: Path) -> Iterable[Tuple[Path, str]]:
 
 
 def sanitize_name(rel_path: str) -> str:
-  safe = rel_path.strip("/").replace("/", "_").replace(".", "_")
+  safe = (
+      rel_path.strip("/")
+      .replace("/", "_")
+      .replace(".", "_")
+      .replace("-", "_")
+  )
   return f"file_{safe}"
 
 

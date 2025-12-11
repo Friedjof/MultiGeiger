@@ -43,6 +43,7 @@ public:
   void publishLive(float countRate, float doseRate, int counts, int dt_ms, int hv_pulses_delta,
                    int accumulated_counts, int accumulated_time_ms, float accumulated_rate, float accumulated_dose,
                    float temperature, float humidity, float pressure);
+  unsigned long getLastPublishTime() const { return lastPublishMs; }
 
 private:
   void ensureConnected();

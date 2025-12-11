@@ -21,6 +21,7 @@ public:
   void update(unsigned int cpm);
   bool connected() const;
   void disable();
+  int getConnectedCount() const;
 
 private:
   class ServerCallbacks;

@@ -21,6 +21,7 @@ static const char *Serial_One_Minute_Log_Body = "DATA %4d %10d %29d";
 void CoreServices::setupLogger(int level) {
   Serial.begin(115200);
   while (!Serial) {};
+  CoreServices::logMessage(NOLOG, "%s, Version %s", Serial_Logging_Name, VERSION_STR);  // this will always be output
   CoreServices::logMessage(NOLOG, "Logging initialized at level %d.", level);  // this will always be output
   log_level = level;
 }
@@ -42,7 +43,7 @@ void CoreServices::logMessageVa(int level, const char *format, va_list args) {
   va_end(args_copy);
 
   char buf[needed + 1 + LOG_PREFIX_LEN];
-  sprintf(buf, LOG_PREFIX_FORMAT, utctime());
+  sprintf(buf, LOG_PREFIX_FORMAT, localtime_str());
 
   va_list args_copy2;
   va_copy(args_copy2, args);

@@ -72,6 +72,12 @@ public:
   /** @brief Check for HV error */
   bool hasHvError() const { return hv_error; }
 
+  /** @brief Get MQTT publisher instance */
+  const MqttPublisher& getMqtt() const { return mqtt; }
+
+  /** @brief Get BLE service instance */
+  const BleService& getBle() const { return ble; }
+
 private:
   void setupNtp(int wifiStatus);
   int updateWifiStatus();

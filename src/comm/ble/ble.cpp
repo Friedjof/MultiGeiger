@@ -115,3 +115,10 @@ void BleService::disable() {
   ble_enabled = false;
   set_status(STATUS_BLE, ST_BLE_OFF);
 }
+
+int BleService::getConnectedCount() const {
+  if (!ble_enabled || !bleServer) {
+    return 0;
+  }
+  return bleServer->getConnectedCount();
+}

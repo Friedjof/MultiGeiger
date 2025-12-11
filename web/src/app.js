@@ -45,6 +45,8 @@ export class MultiGeigerApp {
     this.useMock = shouldUseMockFromQuery();
     this.mockApi = null;
     this.statusTimer = null;
+    this.timeTimer = null;
+    this.timeOffsetMs = 0;
     this.heartbeatTimer = null;
     this.lastStatusAt = null;
     this.currentView = this.getInitialView();
@@ -65,8 +67,8 @@ export class MultiGeigerApp {
 
     this.refreshStatus();
     this.startStatusPoll();
+    this.startTimeSync();
     this.loadConfig();
-    this.startLastUpdateTicker();
   }
 
   getInitialView() {
@@ -155,10 +157,12 @@ export class MultiGeigerApp {
       return this.callMock(path, options);
     }
 
+    // Send browser time with every request for automatic sync
     const response = await fetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'X-Client-Time': Date.now().toString(),
         ...(options.headers || {}),
       },
     });
@@ -194,6 +198,11 @@ export class MultiGeigerApp {
         return this.mockApi.ping();
       case '/update':
         return this.mockApi.uploadFirmware(body?.file);
+      case '/api/time':
+        if (options.method === 'POST') {
+          return this.mockApi.setTime(body);
+        }
+        return this.mockApi.getTime();
       default:
         throw new Error(`Mock route not implemented: ${path}`);
     }
@@ -227,11 +236,14 @@ export class MultiGeigerApp {
       hvWarning.classList.toggle('hidden', !data.hv_error);
     }
 
+    // Update status tiles
+    this.updateStatusTiles(data);
+
     // Environment fields
     const temp = data.temperature;
     const humidity = data.humidity;
     const pressure = data.pressure;
-    const gas = data.gas ?? data.gas_resistance;
+    const gas = data.gas ?? data.gas_resistance ?? data.gas_resistance_kohm;
     const hasTemp = temp !== undefined && temp !== null;
     const hasHumidity = humidity !== undefined && humidity !== null;
     const hasPressure = pressure !== undefined && pressure !== null;
@@ -274,7 +286,7 @@ export class MultiGeigerApp {
 
     const sensorBadge = qs('sensorBadge');
     if (sensorBadge) {
-      const sensorName = this.resolveSensorName({ hasGas, hasHumidity, hasPressure, hasTemp });
+      const sensorName = data.sensor || this.resolveSensorName({ hasGas, hasHumidity, hasPressure, hasTemp });
       if (sensorName) {
         sensorBadge.textContent = sensorName;
         sensorBadge.classList.remove('hidden');
@@ -301,6 +313,7 @@ export class MultiGeigerApp {
     }
     if (dot) {
       dot.classList.toggle('online', online);
+      dot.classList.toggle('offline', !online);
     }
   }
 
@@ -311,18 +324,22 @@ export class MultiGeigerApp {
     }
   }
 
-  startLastUpdateTicker() {
-    const target = qs('lastUpdate');
-    if (!target) return;
-    setInterval(() => {
-      if (!this.lastStatusAt) {
-        target.textContent = 'Waiting...';
-        return;
+  startTimeSync() {
+    clearInterval(this.timeTimer);
+    this.syncTime();
+    this.timeTimer = setInterval(() => this.syncTime(), 10000);
+  }
+
+  async syncTime() {
+    try {
+      const now = Date.now();
+      const res = await this.apiRequest('/api/time');
+      if (res && typeof res.epoch_ms === 'number') {
+        this.timeOffsetMs = res.epoch_ms - now;
       }
-      const diff = Math.max(0, Math.round((Date.now() - this.lastStatusAt) / 1000));
-      const text = diff === 0 ? 'Just updated' : `Updated ${diff}s ago`;
-      target.textContent = text;
-    }, 1000);
+    } catch (err) {
+      console.warn('Time sync failed', err);
+    }
   }
 
   bindConfigForm() {
@@ -592,5 +609,196 @@ export class MultiGeigerApp {
     el.classList.remove('hidden', 'success', 'error');
     if (type === 'success') el.classList.add('success');
     if (type === 'error') el.classList.add('error');
+  }
+
+  updateStatusTiles(data) {
+    // WiFi status - distinguish between AP and STA mode
+    const wifiMode = data.wifi_mode || 'STA'; // 'AP' or 'STA'
+    const isAPMode = wifiMode === 'AP';
+    const wifiConnected = data.wifi_connected !== false;
+    const hasInternet = wifiConnected && !isAPMode;
+
+    let wifiInfo = '';
+    let wifiState = 'inactive';
+
+    if (isAPMode) {
+      wifiState = 'active';
+      const parts = ['AP Mode'];
+      if (data.wifi_ssid) parts.push(data.wifi_ssid);
+      if (data.wifi_ip) parts.push(data.wifi_ip);
+      wifiInfo = parts.join('\n');
+    } else if (wifiConnected) {
+      wifiState = 'active';
+      const quality = this.rssiToQuality(data.wifi_rssi);
+      const parts = [];
+      if (data.wifi_ssid) parts.push(data.wifi_ssid);
+      if (quality) parts.push(quality);
+      wifiInfo = parts.join('\n');
+    } else {
+      wifiInfo = 'Disconnected';
+    }
+
+    this.setTileStatus('wifi', wifiState, wifiInfo);
+
+    // MQTT status - needs internet
+    const mqttEnabled = data.mqtt_enabled || (this.originalConfig?.sendToMqtt);
+    const mqttConnected = data.mqtt_connected;
+    let mqttState = 'inactive';
+    let mqttInfo = 'Not configured';
+
+    if (isAPMode && mqttEnabled) {
+      mqttState = 'inactive';
+      mqttInfo = 'No internet\n(AP mode)';
+    } else if (mqttConnected) {
+      mqttState = 'active';
+      mqttInfo = data.mqtt_last_publish
+        ? `Last publish:\n${this.formatTimestamp(data.mqtt_last_publish)}`
+        : 'Connected';
+    } else if (mqttEnabled) {
+      mqttState = 'error';
+      mqttInfo = 'Not connected';
+    }
+
+    this.setTileStatus('mqtt', mqttState, mqttInfo);
+
+    // LoRa status - works without internet
+    const loraEnabled = data.lora_enabled || (this.originalConfig?.sendToLora);
+    let loraInfo = 'Not configured';
+
+    if (loraEnabled) {
+      if (data.lora_last_send) {
+        loraInfo = `Last send:\n${this.formatTimestamp(data.lora_last_send)}`;
+      } else {
+        loraInfo = 'No transmissions yet';
+      }
+    }
+
+    this.setTileStatus('lora', loraEnabled ? 'active' : 'inactive', loraInfo);
+
+    // sensor.community status - needs internet
+    const communityEnabled = data.community_enabled || (this.originalConfig?.sendToCommunity);
+    let communityState = 'inactive';
+    let communityInfo = 'Disabled';
+
+    if (isAPMode && communityEnabled) {
+      communityInfo = 'No internet\n(AP mode)';
+    } else if (communityEnabled) {
+      communityState = 'active';
+      communityInfo = data.community_last_send
+        ? `Last upload:\n${this.formatTimestamp(data.community_last_send)}`
+        : 'No uploads yet';
+    }
+
+    this.setTileStatus('community', communityState, communityInfo);
+
+    // madavi.de status - needs internet
+    const madaviEnabled = data.madavi_enabled || (this.originalConfig?.sendToMadavi);
+    let madaviState = 'inactive';
+    let madaviInfo = 'Disabled';
+
+    if (isAPMode && madaviEnabled) {
+      madaviInfo = 'No internet\n(AP mode)';
+    } else if (madaviEnabled) {
+      madaviState = 'active';
+      madaviInfo = data.madavi_last_send
+        ? `Last upload:\n${this.formatTimestamp(data.madavi_last_send)}`
+        : 'No uploads yet';
+    }
+
+    this.setTileStatus('madavi', madaviState, madaviInfo);
+
+    // BLE status - works locally
+    const bleEnabled = data.ble_enabled || (this.originalConfig?.sendToBle);
+    let bleInfo = 'Disabled';
+
+    if (bleEnabled) {
+      const connections = data.ble_connections || 0;
+      bleInfo = connections > 0
+        ? `${connections} client${connections > 1 ? 's' : ''}\nconnected`
+        : 'Broadcasting';
+    }
+
+    this.setTileStatus('ble', bleEnabled ? 'active' : 'inactive', bleInfo);
+
+    // Sensor status
+    const sensorName = data.sensor || this.resolveSensorName({
+      hasGas: data.gas !== undefined && data.gas !== null,
+      hasHumidity: data.humidity !== undefined && data.humidity !== null,
+      hasPressure: data.pressure !== undefined && data.pressure !== null,
+      hasTemp: data.temperature !== undefined && data.temperature !== null
+    });
+    const hasSensor = !!sensorName;
+    let sensorInfo = 'No sensor detected';
+
+    if (hasSensor) {
+      const parts = [sensorName];
+      const values = [];
+      if (data.temperature !== undefined && data.temperature !== null) {
+        values.push(`${clampDecimals(data.temperature, 1)}°C`);
+      }
+      if (data.humidity !== undefined && data.humidity !== null && sensorName !== 'BMP280') {
+        values.push(`${clampDecimals(data.humidity, 0)}%`);
+      }
+      if (values.length > 0) {
+        parts.push(values.join(' • '));
+      }
+      sensorInfo = parts.join('\n');
+    }
+
+    this.setTileStatus('sensor', hasSensor ? 'active' : 'inactive', sensorInfo);
+
+    // Display status
+    const displayEnabled = this.originalConfig?.showDisplay !== false;
+    this.setTileStatus('display',
+      displayEnabled ? 'active' : 'inactive',
+      displayEnabled ? 'Active' : 'Disabled');
+
+    // OTA status - available in both AP and STA mode
+    const otaReady = wifiConnected; // Available if WiFi is active (AP or STA)
+    let otaInfo = 'Ready';
+    if (!otaReady) {
+      otaInfo = 'Waiting for WiFi';
+    } else if (isAPMode) {
+      otaInfo = 'Ready\n(AP mode)';
+    }
+    this.setTileStatus('ota', otaReady ? 'active' : 'inactive', otaInfo);
+  }
+
+  rssiToQuality(rssi) {
+    if (!rssi) return null;
+    if (rssi >= -50) return 'Excellent';
+    if (rssi >= -60) return 'Good';
+    if (rssi >= -70) return 'Fair';
+    if (rssi >= -80) return 'Weak';
+    return 'Poor';
+  }
+
+  setTileStatus(tileId, state, info) {
+    const statusEl = qs(`${tileId}-status`);
+    const infoEl = qs(`${tileId}-info`);
+
+    if (statusEl) {
+      statusEl.textContent = state;
+      statusEl.setAttribute('data-state', state);
+    }
+
+    if (infoEl) {
+      infoEl.textContent = info;
+    }
+  }
+
+  formatTimestamp(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
   }
 }
