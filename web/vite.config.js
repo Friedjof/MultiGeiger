@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { resolve, dirname } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Read version from VERSION file
 function readVersion() {
   try {
-    const version = readFileSync(resolve(__dirname, '../VERSION'), 'utf-8').trim();
+    const versionRaw = readFileSync(resolve(__dirname, '../VERSION'), 'utf-8').trim();
+    const version = versionRaw.replace(/^\/+\s*/, '');
     return version || 'dev';
   } catch (e) {
     console.warn('VERSION file not found, using "dev"');
@@ -16,15 +20,13 @@ function readVersion() {
 export default defineConfig({
   root: '.',
   publicDir: 'public',
+  appType: 'spa',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
+    minify: 'esbuild',
+    esbuild: {
+      drop: ['console', 'debugger']
     },
     rollupOptions: {
       output: {

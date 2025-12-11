@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>MultiGeiger</title>
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-icon">☢️</div>
+          <div class="brand-text">
+            <div class="brand-title">MultiGeiger</div>
+            <div class="brand-subtitle">Live readings</div>
+          </div>
+        </div>
+        <div class="status-block">
+          <div class="status-row">
+            <span class="dot" id="connectionDot"></span>
+            <span id="connectionState">Connecting…</span>
+          </div>
+          <div class="status-row small" id="lastUpdate">—</div>
+        </div>
+      </header>
+
+      <main class="views">
+        <div class="hero-simple card sticky-hero">
+          <div class="hero-top">
+            <div class="hero-label">Dose rate</div>
+            <div class="hero-meta">
+              <span class="status-badge" id="statusBadge">Live</span>
+              <span id="hvWarning" class="chip danger hidden">HV error</span>
+            </div>
+          </div>
+          <div class="hero-number">
+            <span id="doseRate">--</span>
+            <span class="hero-unit">µSv/h</span>
+          </div>
+          <div class="panel-toggle">
+            <button class="toggle-btn active" data-target="dashboard">Dashboard</button>
+            <button class="toggle-btn" data-target="settings">Settings</button>
+          </div>
+        </div>
+
+        <section id="panel-dashboard" data-panel="dashboard">
+          <div class="card env-card hidden" id="envCard">
+            <div class="row-title">Weather</div>
+            <div class="row env-row">
+              <div class="env-item">
+                <span class="env-label">Temp</span>
+                <span class="env-value" id="temperature">--</span>
+                <span class="env-unit">°C</span>
+              </div>
+              <div class="env-item">
+                <span class="env-label">Humidity</span>
+                <span class="env-value" id="humidity">--</span>
+                <span class="env-unit">%</span>
+              </div>
+              <div class="env-item">
+                <span class="env-label">Pressure</span>
+                <span class="env-value" id="pressure">--</span>
+                <span class="env-unit">hPa</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="row stats-row">
+            <div class="card stat-card">
+              <div class="stat-label">CPM</div>
+              <div id="cpm" class="stat-value">--</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-label">Counts</div>
+              <div id="counts" class="stat-value">--</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-label">Uptime</div>
+              <div id="uptime" class="stat-value">--</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-settings" data-panel="settings" hidden>
+          <div class="card section-card">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Configuration</div>
+                <div class="section-subtitle">
+                  Auth required. Changes may restart the device.
+                </div>
+              </div>
+              <div class="section-actions">
+                <button id="resetConfig" class="ghost" type="button">Reset</button>
+                <button id="saveConfig" class="primary" form="configForm" type="submit">
+                  Save
+                </button>
+              </div>
+            </div>
+            <div id="configStatus" class="banner hidden"></div>
+            <form id="configForm" class="accordion-list">
+              <details class="accordion">
+                <summary>WiFi</summary>
+                <div class="accordion-body">
+                  <label class="field">
+                    <span>Access Point Name</span>
+                    <input id="thingName" name="thingName" type="text" required />
+                  </label>
+                  <label class="field">
+                    <span>Access Point Password</span>
+                    <input id="apPassword" name="apPassword" type="password" required minlength="8" />
+                  </label>
+                  <label class="field">
+                    <span>WiFi Client SSID</span>
+                    <input id="wifiSsid" name="wifiSsid" type="text" />
+                  </label>
+                  <label class="field">
+                    <span>WiFi Client Password</span>
+                    <input id="wifiPassword" name="wifiPassword" type="password" />
+                  </label>
+                </div>
+              </details>
+
+              <details class="accordion">
+                <summary>Device</summary>
+                <div class="accordion-body">
+                  <label class="checkbox">
+                    <input type="checkbox" id="startSound" name="startSound" />
+                    <span>Start sound</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="speakerTick" name="speakerTick" />
+                    <span>Speaker tick</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="ledTick" name="ledTick" />
+                    <span>LED tick</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="showDisplay" name="showDisplay" />
+                    <span>Show display</span>
+                  </label>
+                </div>
+              </details>
+
+              <details class="accordion">
+                <summary>Transmission</summary>
+                <div class="accordion-body">
+                  <label class="checkbox">
+                    <input type="checkbox" id="sendToCommunity" name="sendToCommunity" />
+                    <span>Send to sensor.community</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="sendToMadavi" name="sendToMadavi" />
+                    <span>Send to madavi.de</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="sendToBle" name="sendToBle" />
+                    <span>Send via BLE</span>
+                  </label>
+                </div>
+              </details>
+
+              <details class="accordion">
+                <summary>MQTT</summary>
+                <div class="accordion-body">
+                  <label class="checkbox">
+                    <input type="checkbox" id="sendToMqtt" name="sendToMqtt" />
+                    <span>Enable MQTT</span>
+                  </label>
+                  <label class="field">
+                    <span>Broker</span>
+                    <input id="mqttHost" name="mqttHost" type="text" placeholder="mqtt.example.com" />
+                  </label>
+                  <label class="field inline">
+                    <span>Port</span>
+                    <input id="mqttPort" name="mqttPort" type="number" min="1" max="65535" placeholder="1883" />
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="mqttUseTls" name="mqttUseTls" />
+                    <span>Use TLS (insecure PoC)</span>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" id="mqttRetain" name="mqttRetain" />
+                    <span>Retain MQTT messages</span>
+                  </label>
+                  <label class="field">
+                    <span>Username</span>
+                    <input id="mqttUsername" name="mqttUsername" type="text" autocomplete="username" />
+                  </label>
+                  <label class="field">
+                    <span>Password</span>
+                    <input id="mqttPassword" name="mqttPassword" type="password" autocomplete="current-password" />
+                  </label>
+                  <label class="field">
+                    <span>Base topic</span>
+                    <input id="mqttBaseTopic" name="mqttBaseTopic" type="text" placeholder="multigeiger" />
+                  </label>
+                </div>
+              </details>
+
+              <details class="accordion hidden" id="loraGroup">
+                <summary>LoRa / TTN</summary>
+                <div class="accordion-body">
+                  <label class="checkbox">
+                    <input type="checkbox" id="sendToLora" name="sendToLora" />
+                    <span>Send to LoRa/TTN</span>
+                  </label>
+                  <label class="field">
+                    <span>DevAddr</span>
+                    <input id="devaddr" name="devaddr" type="text" />
+                  </label>
+                  <label class="field">
+                    <span>NwkSKey</span>
+                    <input id="nwkskey" name="nwkskey" type="text" />
+                  </label>
+                  <label class="field">
+                    <span>AppSKey</span>
+                    <input id="appskey" name="appskey" type="text" />
+                  </label>
+                </div>
+              </details>
+
+              <details class="accordion">
+                <summary>Alarm</summary>
+                <div class="accordion-body">
+                  <label class="checkbox">
+                    <input type="checkbox" id="soundLocalAlarm" name="soundLocalAlarm" />
+                    <span>Enable local alarm</span>
+                  </label>
+                  <label class="field">
+                    <span>Threshold (µSv/h)</span>
+                    <input id="localAlarmThreshold" name="localAlarmThreshold" type="number" step="0.1" />
+                  </label>
+                  <label class="field">
+                    <span>Factor</span>
+                    <input id="localAlarmFactor" name="localAlarmFactor" type="number" step="1" />
+                  </label>
+                </div>
+              </details>
+            </form>
+          </div>
+
+          <div class="card section-card">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Firmware update</div>
+                <div class="section-subtitle">Upload a .bin file</div>
+              </div>
+            </div>
+            <form id="uploadForm" class="upload-form">
+              <input id="firmwareFile" type="file" accept=".bin" />
+              <button id="uploadButton" type="submit" class="primary">Upload</button>
+            </form>
+            <div id="uploadProgress" class="progress hidden">
+              <div class="progress-bar" id="uploadProgressBar"></div>
+              <div class="progress-label" id="uploadProgressLabel">0%</div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <span class="footer-name">MultiGeiger</span>
+          <span class="sep">·</span>
+          <a id="uiVersionFooter" href="#" target="_blank" rel="noopener">—</a>
+        </footer>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

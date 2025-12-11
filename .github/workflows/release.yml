@@ -35,13 +35,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Prepare default config
         run: |
           bash tools/prepare_config.sh
 
       - name: Build web assets
         run: |
-          python tools/embed_web.py
+          cd web
+          npm install
+          npm run build
+          cd ..
+          python scripts/web_to_header.py web/dist -o lib/WebService/generated/web_files.h
 
       - name: Build firmware
         run: |

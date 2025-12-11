@@ -42,4 +42,4 @@ Notes
 -----
 
 - ``tools/prepare_config.sh`` auto-generates ``src/config/config.hpp`` from the default; adjust configuration locally if you build yourself.
-- ``tools/embed_web.py`` runs on each build so firmware always contains the current web UI.
+- ``scripts/web_to_header.py`` runs on each build (via ``make web``) so firmware always contains the current Vite-built web UI.

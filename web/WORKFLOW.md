@@ -1,123 +1,47 @@
-# Web Frontend Workflow
+# Web Frontend Workflow (Vite)
 
-## 🔄 Entwicklungs-Workflow
-
-### 1. Lokale Entwicklung
+## Entwicklung
 
 ```bash
-# Terminal 1: Starte lokalen Server
 cd web
-python3 -m http.server 8000
-
-# Browser öffnen:
-http://localhost:8000/dashboard.html
+npm install
+npm run dev
+# Browser: http://localhost:5173/?mock=1  (Mock an, mock=0 aus)
 ```
 
-Das Dashboard nutzt automatisch Mock-Daten (`mock-api.json`) wenn lokal entwickelt wird.
+- Plain-JS-Vite, keine Frameworks. Entry: `index.html` → `src/main.js`.
+- Dev-Server proxyt `/api` → `http://192.168.4.1` (anpassbar in `vite.config.js`).
 
-### 2. Dateien bearbeiten
-
-- `dashboard.html` - HTML-Struktur
-- `style.css` - Styling (eigenes CSS!)
-- `app.js` - JavaScript-Logik
-- `mock-api.json` - Test-Daten
-
-Browser lädt automatisch neu bei Änderungen (mit Live Server Extension).
-
-### 3. Build & Deploy
+## Build → Header
 
 ```bash
-# Methode 1: Nur Web-Assets neu bauen
 make web
-
-# Methode 2: Alles neu bauen (inkl. Web)
-make clean && make
-
-# Methode 3: Bauen + Flashen + Monitor
-make run
+# oder manuell:
+cd web && npm run build
+python scripts/web_to_header.py web/dist -o lib/WebService/generated/web_files.h
 ```
 
-## 📦 Was passiert beim Build?
+- `web/dist` wird gzip-komprimiert und in `web_files.h` geschrieben.
+- Struktur im Header: `webFiles[]`, `webFilesCount`, `findWebFile(path)`, `sendWebFile(server, file)`.
 
-```
-make web
-  ↓
-tools/embed_web.py
-  ↓
-1. Liest web/dashboard.html, web/style.css, web/app.js
-2. Komprimiert mit gzip (~70% kleiner!)
-3. Konvertiert in C-Arrays
-  ↓
-src/comm/wifi/web_assets.h (generiert)
-  ↓
-make build (PlatformIO)
-  ↓
-firmware.bin
-```
+## Firmware-Serve
 
-## 🎯 Make-Befehle
+1. In HTTP-Handler angefragten Pfad (`server.uri()`) via `findWebFile` nachschlagen.
+2. Bei Treffer: `sendWebFile(server, file)` (setzt `Content-Encoding: gzip`).
+3. Für SPA-Routen auf `/index.html` zurückfallen.
 
-| Befehl | Beschreibung |
-|--------|--------------|
-| `make web` | Nur Web-Assets neu bauen |
-| `make build` | Web + Firmware bauen |
-| `make flash` | Firmware flashen |
-| `make monitor` | Serial Monitor |
-| `make run` | Flash + Monitor |
-| `make clean` | Alles löschen |
+## Make-Ziele
 
-## ⚡ Schneller Workflow
+| Befehl     | Beschreibung                                 |
+|------------|----------------------------------------------|
+| `make web` | npm build + Header-Generation                |
+| `make build` | Firmware build (ruft `make web` vorher)    |
+| `make flash` | Firmware flashen                           |
+| `make run` | Flash + Monitor                              |
+| `make clean` | Build-Artefakte + Header löschen           |
 
-```bash
-# 1. HTML/CSS/JS bearbeiten in web/
-# 2. Im Browser testen (localhost:8000)
-# 3. Wenn fertig:
-make run
-```
+## Debug-Tipps
 
-Der `make build` Befehl führt **automatisch** `make web` aus!
-
-## 🔍 Debug-Tipps
-
-### Browser
-- F12 → Console für JavaScript-Fehler
-- Network-Tab für API-Calls
-
-### ESP32
-```bash
-make monitor
-# Zeigt:
-# - "Building web frontend..." beim Build
-# - HTTP-Requests im Serial Monitor
-# - API-Responses
-```
-
-### Build-Probleme
-```bash
-# Alte Artifacts löschen
-make clean
-
-# Web-Assets manuell neu generieren
-python3 tools/embed_web.py
-
-# Prüfen ob generiert wurde
-ls -lh src/comm/wifi/web_assets.h
-```
-
-## 📊 Größen-Optimierung
-
-Aktuelle Kompression (gzip):
-- `dashboard.html`: 3746 → 859 bytes (77% kleiner)
-- `style.css`: 4974 → 1536 bytes (69% kleiner)
-- `app.js`: 5486 → 1597 bytes (71% kleiner)
-
-**Gesamt**: ~14 KB → ~4 KB (Flash-Speicher)
-
-## 🚀 Live-Reload (optional)
-
-Mit VS Code "Live Server" Extension:
-1. Extension installieren
-2. Rechtsklick auf `dashboard.html`
-3. "Open with Live Server"
-
-Änderungen werden sofort im Browser sichtbar!
+- Browser-Konsole + Network-Tab prüfen.
+- Wenn Mock aktiv ist: State liegt in `localStorage` (`multigeiger:config`).
+- Build-Fehler: `web/dist` existiert? Header vorhanden? `make clean && make web`.

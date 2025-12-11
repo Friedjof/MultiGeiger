@@ -5,15 +5,19 @@ VENV ?= .venv
 PYTHON ?= python3
 SPHINXBUILD ?= $(CURDIR)/$(VENV)/bin/sphinx-build
 DOCS_STAMP ?= $(VENV)/.docs-installed
-WEB_ASSETS ?= src/comm/wifi/web_assets.h
+WEB_ASSETS ?= lib/WebService/generated/web_files.h
 
 .PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web release
 
 all: build
 
 build-web:
-	@echo "Building web frontend..."
-	@$(PYTHON) tools/embed_web.py
+	@echo "Building web frontend (Vite -> header)..."
+	@cd web && npm install
+	@cd web && npm run build
+	@$(PYTHON) scripts/web_to_header.py web/dist -o lib/WebService/generated/web_files.h
+
+web: build-web
 
 build: build-web
 	@$(PIO) run -e $(ENV)
@@ -29,7 +33,6 @@ run: flash
 
 clean:
 	@$(PIO) run -t clean -e $(ENV)
-	@rm -f $(WEB_ASSETS)
 
 setup:
 	@test -f src/config/config.hpp || cp src/config/config.default.hpp src/config/config.hpp

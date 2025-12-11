@@ -187,7 +187,7 @@ The project uses a **Makefile** for common tasks:
 
 ```bash
 make build          # Build web assets + compile firmware
-make web            # Build web interface only (embed_web.py)
+make web            # Build web UI (Vite) + generate header
 make flash          # Upload firmware to device
 make monitor        # Open serial monitor (115200 baud)
 make clean          # Clean build artifacts
@@ -217,7 +217,7 @@ make release        # Build release firmware (optimized)
 
 The Makefile automates:
 
-- 🌐 **Web asset bundling**: Minifies HTML/CSS/JS and embeds them into firmware
+- 🌐 **Web asset bundling**: Vite build + gzip + Header-Export für das ESP32-Frontend
 - 📦 **Dependency management**: Installs PlatformIO libraries
 - 🔨 **Multi-environment builds**: ESP32, ESP32-S2, ESP32-C3 variants
 - 🚀 **CI/CD integration**: Same commands used in GitHub Actions
@@ -235,21 +235,25 @@ MultiGeiger/
 │   ├── sensors/             # Geiger tube, BMP280/BME280/BME680
 │   └── main.cpp             # Entry point
 ├── web/                     # Web interface
-│   ├── index.html           # Dashboard
-│   ├── config.html          # Configuration page
-│   ├── config.js            # Config logic
-│   └── styles.css           # Responsive styles
+│   ├── index.html           # Vite entry (Dashboard + Config + OTA)
+│   ├── src/                 # JS/CSS sources
+│   │   ├── main.js
+│   │   ├── app.js
+│   │   └── style.css
+│   └── public/mock/api.js   # Mock-API für lokale Entwicklung
 ├── docs/                    # Sphinx documentation
 │   ├── source/              # reStructuredText files
 │   ├── images/              # Screenshots
 │   └── assembly/            # Assembly PDFs
 ├── tools/                   # Build & data tools
-│   ├── embed_web.py         # Minify & embed web assets
+│   ├── embed_web.py         # (legacy) älteres Embed-Skript
 │   ├── ttn_fetcher/         # TTN data downloader
 │   │   ├── fetch_ttn_data.py    # CLI tool
 │   │   ├── ttn_daemon.py        # Background daemon
 │   │   └── README.md        # TTN fetcher docs
 │   └── mqtt_logger/         # MQTT to SQLite logger
+├── scripts/                 # Helper scripts
+│   └── web_to_header.py     # dist/ → gzip Header (genutzt im Makefile)
 ├── .github/                 # CI/CD workflows
 │   └── workflows/
 │       └── build.yml        # Automated builds

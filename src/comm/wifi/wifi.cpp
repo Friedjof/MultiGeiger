@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "app/controller.hpp"
-#include "web_assets.h"
+#include "web_files.h"
 
 extern MultiGeigerController controller;
 
@@ -698,10 +698,29 @@ void handleApiStatus(void) {
   server.send(200, "application/json", json);
 }
 
+static bool sendWebAsset(const String& path) {
+  String normalized = path;
+  if (normalized == "/" || normalized.length() == 0) {
+    normalized = "/index.html";
+  }
+
+  const WebFile* file = findWebFile(normalized);
+  if (!file && normalized != "/index.html") {
+    file = findWebFile("/index.html");
+  }
+  if (!file) {
+    return false;
+  }
+
+  sendWebFile(server, file);
+  return true;
+}
+
 void handleRoot(void) {  // Handle web requests to "/" path.
-  // Serve modern dashboard with live data (read-only, no need to disable ticks)
-  // User can access dashboard even in AP mode - config is available at /config
-  serveCompressed(server, dashboard_html_gz, dashboard_html_gz_len, "text/html");
+  // Serve dashboard shell; config is reachable via /config (auth protected)
+  if (!sendWebAsset("/index.html")) {
+    server.send(500, "text/plain", "Web UI missing");
+  }
 }
 
 void handleConfigPage(void) {
@@ -719,7 +738,9 @@ void handleConfigPage(void) {
   lastConfigPingTime = millis();
 
   // Serve config page
-  serveCompressed(server, config_html_gz, config_html_gz_len, "text/html");
+  if (!sendWebAsset("/index.html")) {
+    server.send(500, "text/plain", "Web UI missing");
+  }
 }
 
 void handleConfigPing(void) {
@@ -728,6 +749,9 @@ void handleConfigPing(void) {
     return;  // Auth failed, 401 response already sent
   }
 
+  // Mark config page as active even when loaded via SPA
+  configPageActive = true;
+  tick_enable(false);
   // Update heartbeat timestamp
   lastConfigPingTime = millis();
   server.send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1157,26 +1181,10 @@ void setup_webconf(bool loraHardware) {
 
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
+  server.on("/index.html", handleRoot);
+  server.on("/config", handleConfigPage);
+  server.on("/config/", handleConfigPage);
   server.on("/api/status", handleApiStatus);
-
-  // Serve dashboard assets
-  server.on("/style.css", []() {
-    serveCompressed(server, style_css_gz, style_css_gz_len, "text/css");
-  });
-  server.on("/app.js", []() {
-    serveCompressed(server, app_js_gz, app_js_gz_len, "application/javascript");
-  });
-
-  // Serve config page and assets (all protected with auth)
-  server.on("/config.html", handleConfigPage);
-  server.on("/config-style.css", []() {
-    if (!checkHttpAuth()) return;
-    serveCompressed(server, config_style_css_gz, config_style_css_gz_len, "text/css");
-  });
-  server.on("/config.js", []() {
-    if (!checkHttpAuth()) return;
-    serveCompressed(server, config_js_gz, config_js_gz_len, "application/javascript");
-  });
 
   // Config API endpoints
   server.on("/api/config", HTTP_GET, handleGetConfig);
@@ -1188,7 +1196,6 @@ void setup_webconf(bool loraHardware) {
   server.on("/gen_204", HTTP_ANY, redirectToCaptivePortal);           // older Android variants
   server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
   server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
-  server.on("/config", handleConfigPage);
 
   // OTA Update endpoint - explicitly register handlers for HTTPUpdateServer
   server.on("/update", HTTP_GET, []() {
@@ -1228,9 +1235,15 @@ void setup_webconf(bool loraHardware) {
   });
 
   server.onNotFound([]() {
-    // Redirect all unknown requests to root (captive portal behavior)
-    server.sendHeader("Location", "/");
-    server.send(302, "text/plain", "");
+    const String path = server.uri();
+    if (sendWebAsset(path)) {
+      return;
+    }
+    // SPA fallback
+    if (sendWebAsset("/index.html")) {
+      return;
+    }
+    server.send(404, "text/plain", "Not found");
   });
 
   // Start web server
