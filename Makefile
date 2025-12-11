@@ -69,6 +69,8 @@ endif
 	@echo "Creating release v$(VERSION_CLEAN)..."
 	@echo "// v$(VERSION_CLEAN)" > VERSION
 	@echo "Version file updated to v$(VERSION_CLEAN)"
+	@echo "Injecting version into core.hpp..."
+	@$(PYTHON) scripts/inject_version.py
 	@$(MAKE) build-web
 	@echo "Preparing release commit with recent changes..."
 	@echo "Release v$(VERSION_CLEAN)" > /tmp/release_msg.txt
@@ -86,7 +88,7 @@ endif
 		echo "Recent changes:" >> /tmp/release_msg.txt; \
 		git log -5 --format="- %s" >> /tmp/release_msg.txt; \
 	fi
-	@git add VERSION
+	@git add VERSION src/core/core.hpp
 	@git commit -F /tmp/release_msg.txt
 	@rm /tmp/release_msg.txt
 	@git tag v$(VERSION_CLEAN)
