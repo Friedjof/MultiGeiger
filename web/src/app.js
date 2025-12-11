@@ -227,29 +227,77 @@ export class MultiGeigerApp {
       hvWarning.classList.toggle('hidden', !data.hv_error);
     }
 
-    const hasEnv = data.has_thp;
+    // Environment fields
+    const temp = data.temperature;
+    const humidity = data.humidity;
+    const pressure = data.pressure;
+    const gas = data.gas ?? data.gas_resistance;
+    const hasTemp = temp !== undefined && temp !== null;
+    const hasHumidity = humidity !== undefined && humidity !== null;
+    const hasPressure = pressure !== undefined && pressure !== null;
+    const hasGas = gas !== undefined && gas !== null;
+    const hasEnv = hasTemp || hasHumidity || hasPressure || hasGas || data.has_thp;
+
     const envCard = qs('envCard');
     if (envCard) {
       envCard.classList.toggle('hidden', !hasEnv);
     }
 
-    if (hasEnv) {
-      this.updateText('temperature', clampDecimals(Number(data.temperature), 1));
-      this.updateText('humidity', clampDecimals(Number(data.humidity), 1));
-      this.updateText('pressure', clampDecimals(Number(data.pressure), 1));
+    if (hasTemp) {
+      this.updateText('temperature', clampDecimals(Number(temp), 1));
+      qs('temperature')?.parentElement?.classList.remove('hidden');
+    } else {
+      qs('temperature')?.parentElement?.classList.add('hidden');
     }
 
-    if (this.statusBadge) {
-      this.statusBadge.textContent = 'Live';
+    if (hasHumidity) {
+      this.updateText('humidity', clampDecimals(Number(humidity), 1));
+      qs('humidity')?.parentElement?.classList.remove('hidden');
+    } else {
+      qs('humidity')?.parentElement?.classList.add('hidden');
     }
+
+    if (hasPressure) {
+      this.updateText('pressure', clampDecimals(Number(pressure), 1));
+      qs('pressure')?.parentElement?.classList.remove('hidden');
+    } else {
+      qs('pressure')?.parentElement?.classList.add('hidden');
+    }
+
+    const gasItem = qs('gasItem');
+    if (hasGas && gasItem) {
+      gasItem.classList.remove('hidden');
+      this.updateText('gasValue', clampDecimals(Number(gas), 0));
+    } else if (gasItem) {
+      gasItem.classList.add('hidden');
+    }
+
+    const sensorBadge = qs('sensorBadge');
+    if (sensorBadge) {
+      const sensorName = this.resolveSensorName({ hasGas, hasHumidity, hasPressure, hasTemp });
+      if (sensorName) {
+        sensorBadge.textContent = sensorName;
+        sensorBadge.classList.remove('hidden');
+      } else {
+        sensorBadge.classList.add('hidden');
+      }
+    }
+
+  }
+
+  resolveSensorName({ hasGas, hasHumidity, hasPressure, hasTemp }) {
+    if (hasGas) return 'BME680';
+    if (hasHumidity && hasPressure && hasTemp) return 'BME280';
+    if (hasPressure && hasTemp) return 'BMP280';
+    if (hasTemp) return 'Temp sensor';
+    return null;
   }
 
   setConnectionState(online) {
-    const stateEl = qs('connectionState');
+    const stateEl = qs('statusText');
     const dot = qs('connectionDot');
     if (stateEl) {
       stateEl.textContent = online ? 'Online' : 'Offline';
-      stateEl.style.color = online ? 'var(--text)' : 'var(--muted)';
     }
     if (dot) {
       dot.classList.toggle('online', online);

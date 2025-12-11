@@ -8,35 +8,32 @@
   </head>
   <body>
     <div id="app" class="app-shell">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-icon">☢️</div>
-          <div class="brand-text">
-            <div class="brand-title">MultiGeiger</div>
-            <div class="brand-subtitle">Live readings</div>
-          </div>
-        </div>
-        <div class="status-block">
-          <div class="status-row">
-            <span class="dot" id="connectionDot"></span>
-            <span id="connectionState">Connecting…</span>
-          </div>
-          <div class="status-row small" id="lastUpdate">—</div>
-        </div>
-      </header>
-
       <main class="views">
         <div class="hero-simple card sticky-hero">
+          <div class="hero-header">
+            <div class="brand">
+              <div class="brand-icon">☢️</div>
+              <div class="brand-text">
+                <div class="brand-title">MultiGeiger</div>
+                <div class="brand-subtitle">Live readings</div>
+              </div>
+            </div>
+          </div>
           <div class="hero-top">
             <div class="hero-label">Dose rate</div>
             <div class="hero-meta">
-              <span class="status-badge" id="statusBadge">Live</span>
               <span id="hvWarning" class="chip danger hidden">HV error</span>
             </div>
           </div>
           <div class="hero-number">
             <span id="doseRate">--</span>
             <span class="hero-unit">µSv/h</span>
+          </div>
+          <div class="hero-status">
+            <span class="status-badge" id="statusBadge">
+              <span class="dot" id="connectionDot"></span>
+              <span class="status-label" id="statusText">Online</span>
+            </span>
           </div>
           <div class="panel-toggle">
             <button class="toggle-btn active" data-target="dashboard">Dashboard</button>
@@ -46,7 +43,10 @@
 
         <section id="panel-dashboard" data-panel="dashboard">
           <div class="card env-card hidden" id="envCard">
-            <div class="row-title">Weather</div>
+            <div class="row-title">
+              <span>Weather</span>
+              <span id="sensorBadge" class="chip sensor hidden"></span>
+            </div>
             <div class="row env-row">
               <div class="env-item">
                 <span class="env-label">Temp</span>
@@ -62,6 +62,11 @@
                 <span class="env-label">Pressure</span>
                 <span class="env-value" id="pressure">--</span>
                 <span class="env-unit">hPa</span>
+              </div>
+              <div class="env-item" id="gasItem">
+                <span class="env-label">Gas</span>
+                <span class="env-value" id="gasValue">--</span>
+                <span class="env-unit">Ω</span>
               </div>
             </div>
           </div>

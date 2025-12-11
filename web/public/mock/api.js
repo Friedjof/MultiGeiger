@@ -1,13 +1,12 @@
-const DEFAULT_STATUS = {
-  counts: 1200,
-  cpm: 42.5,
-  dose_uSvh: 0.12,
-  uptime_s: 3600,
+const BASE_STATUS = {
+  counts: 1500,
+  cpm: 40.0,
+  dose_uSvh: 0.116,
   hv_error: false,
   temperature: 22.8,
   humidity: 48.2,
   pressure: 1014.2,
-  has_thp: true,
+  sensor: 'BME280',
   version: 'v1.0.0-mock',
 };
 
@@ -67,18 +66,26 @@ function saveToStorage(key, value) {
 
 export class MockAPI {
   constructor() {
-    this.status = { ...DEFAULT_STATUS };
+    this.status = { ...BASE_STATUS };
+    this.startedAt = Date.now();
+    this.baseCounts = this.status.counts;
+    this.cps = (this.status.cpm || 0) / 60;
     this.config = loadFromStorage('multigeiger:config', { ...DEFAULT_CONFIG });
   }
 
   async getStatus() {
-    // Simulate slight changes
-    this.status.counts += Math.floor(Math.random() * 4);
-    this.status.cpm = this.status.cpm + (Math.random() - 0.5);
-    this.status.dose_uSvh = this.status.cpm * 0.0029;
-    this.status.uptime_s += POLL_STEP_SECONDS;
+    const elapsed = Math.max(0, Math.floor((Date.now() - this.startedAt) / 1000));
+    const counts = this.baseCounts + Math.round(this.cps * elapsed);
+    const cpm = this.cps * 60;
+    const dose = cpm * 0.0029;
     await sleep();
-    return { ...this.status };
+    return {
+      ...this.status,
+      counts,
+      cpm: Number(cpm.toFixed(1)),
+      dose_uSvh: Number(dose.toFixed(3)),
+      uptime_s: elapsed,
+    };
   }
 
   async getConfig() {
