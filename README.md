@@ -7,41 +7,107 @@ The MultiGeiger is an **ESP32-based radioactivity measurement device** designed 
 
 ## ✨ Key Features
 
-- 📊 **Radiation Measurement** - Accurate detection using Geiger-Müller tubes with real-time CPM/CPS display
-- 🌐 **Modern Web Interface** - Responsive dashboard with live updates and easy configuration
+- 📊 **Radiation Measurement** - Accurate detection using Geiger-Müller tubes with real-time CPM/CPS/µSv/h display
+- 🌐 **Modern Web Interface** - Single-page application (SPA) with live updates and responsive design
+- 🔐 **Secure Access** - Session-based authentication protects configuration and OTA updates
 - 📡 **Multiple Connectivity** - WiFi, LoRaWAN/TTN, BLE, MQTT with TLS support
-- 🌡️ **Environmental Sensors** - Optional temperature, humidity, and pressure monitoring (BMP280/BME280/BME680)
-- ☁️ **Cloud Integration** - MQTT + TTN/LoRaWAN forwarding; direct HTTP uploads to sensor.community/madavi removed
+- 🌡️ **Environmental Sensors** - Optional temperature, humidity, pressure, and air quality monitoring (BMP280/BME280/BME680)
+- ☁️ **Cloud Integration** - MQTT + TTN/LoRaWAN forwarding with OpenSenseMap compatibility
+- ⏰ **Time Synchronization** - Automatic browser-to-device time sync for accurate timestamps
 - 🔋 **Low Power Design** - Optimized for battery operation with deep sleep support
 
 ## 🚀 Quick Start
 
-**Default WiFi Credentials:**
+**Default Credentials:**
 
+WiFi Access Point:
 - SSID: `MultiGeiger-XXXXXX` (last 6 digits of MAC address)
 - Password: `ESP32Geiger`
+
+Web Interface Login:
+- Username: `admin`
+- Password: `admin`
+- ⚠️ **Change these immediately in the Settings page!**
 
 **Steps:**
 
 1. 🔌 Power on your MultiGeiger device
-2. 📶 Connect to the WiFi access point
+2. 📶 Connect to the WiFi access point `MultiGeiger-XXXXXX`
 3. 🌐 Open http://192.168.4.1 in your browser
-4. ⚙️ Configure your settings via the web interface
+4. 📊 View live data on the Dashboard (no login required)
+5. ⚙️ Click "Settings" → Login with `admin`/`admin` → Configure device
+6. 🔐 **Important:** Change password in Settings → Authorization section!
 
 ## 🖥️ Web Interface
 
-The MultiGeiger features a **modern, mobile-optimized web interface** with a clean, responsive design:
+The MultiGeiger features a **modern, single-page web application (SPA)** with session-based authentication, real-time updates, and a mobile-optimized design:
 
-| **Home Dashboard** | **Configuration Page** |
-|:------------------:|:----------------------:|
-| ![MultiGeiger Web Dashboard](docs/images/screenshot-browser-home.png) | ![MultiGeiger Configuration Interface](docs/images/screenshot-browser-config.png) |
-| Real-time monitoring with:<br>• 📈 Live radiation levels (CPM, CPS, µSv/h)<br>• 🌡️ Environmental data<br>• 📊 Historical graphs<br>• 🔔 Status indicators | Easy setup with collapsible sections:<br>• 📶 WiFi configuration<br>• 📡 MQTT settings (with TLS)<br>• 🛰️ LoRaWAN/TTN credentials<br>• ☁️ Data platform integration |
+| **Dashboard** | **Status** | **Settings** |
+|:-------------:|:----------:|:------------:|
+| ![Dashboard](docs/images/screenshot-browser-dashboard.png) | ![Status](docs/images/screenshot-browser-status.png) | ![Settings](docs/images/screenshot-browser-settings.png) |
+| Real-time monitoring:<br>• 📈 Live radiation levels<br>• 🌡️ Environmental data<br>• ⏱️ Uptime & system info<br>• ⚠️ HV error warnings | Connectivity status:<br>• 📶 WiFi signal strength<br>• 📡 MQTT connection<br>• 🛰️ LoRa transmissions<br>• 📲 BLE advertising | Secure configuration:<br>• 🔐 Login-protected access<br>• 📶 WiFi setup<br>• 📡 MQTT & LoRa credentials<br>• ⚙️ Device settings |
+
+### Key Features
+
+- 🔐 **Session Authentication** - Secure login with HttpOnly cookies (30min session timeout)
+- 🔄 **Live Updates** - Real-time polling (2s interval) for instant feedback
+- ⏰ **Time Sync** - Automatic browser-to-device time synchronization
+- 🎨 **Modern UI** - Clean, responsive design built with vanilla JavaScript (no frameworks!)
+- 📱 **Mobile-First** - Touch-friendly interface optimized for smartphones and tablets
+- 🧪 **Mock API** - Local development mode with simulated device data
 
 **Access Points:**
 
 - AP Mode: http://192.168.4.1/
 - Network Mode: http://multigeiger.local/ (mDNS)
 - Direct IP: http://\<device-ip\>/
+
+**Default Login:**
+- Username: `admin`
+- Password: `admin`
+- ⚠️ **Change these immediately after first setup!**
+
+## 🔐 Security & Authentication
+
+### Session-Based Authentication
+
+Protected endpoints (configuration, OTA updates) require login:
+
+- **Session Management**: HttpOnly cookies with 30-minute sliding expiration
+- **CSRF Protection**: SameSite=Lax cookie attribute
+- **AP Mode**: Authentication skipped (WiFi password provides access control)
+- **Default Credentials**: `admin` / `admin` (⚠️ **Change immediately!**)
+
+### Protected Endpoints
+
+- `/config` - Configuration page
+- `/api/config` - Configuration API (GET/POST)
+- `/api/config/ping` - Heartbeat for session keep-alive
+- `/update` - OTA firmware upload
+
+### Security Best Practices
+
+1. ✅ **Change default password** immediately after first setup
+2. ✅ **Use strong credentials** (min. 8 characters, mixed case + numbers)
+3. ✅ **Enable WiFi encryption** (WPA2 or better)
+4. ⚠️ **HTTP only** - ESP32 doesn't support HTTPS (use VPN for remote access)
+5. 🔒 **AP Mode Security** - Strong AP password acts as first authentication layer
+
+### API Access
+
+**Login:**
+```bash
+curl -X POST http://multigeiger.local/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' \
+  -c cookies.txt
+```
+
+**Authenticated Request:**
+```bash
+curl http://multigeiger.local/api/config \
+  -b cookies.txt
+```
 
 ## 📡 Connectivity Options
 
@@ -227,13 +293,17 @@ MultiGeiger/
 │   │   └── mqtt/            # MQTT client
 │   ├── sensors/             # Geiger tube, BMP280/BME280/BME680
 │   └── main.cpp             # Entry point
-├── web/                     # Web interface
-│   ├── index.html           # Vite entry (Dashboard + Config + OTA)
-│   ├── src/                 # JS/CSS sources
-│   │   ├── main.js
-│   │   ├── app.js
-│   │   └── style.css
-│   └── public/mock/api.js   # Mock-API für lokale Entwicklung
+├── web/                     # Web interface (Single-Page Application)
+│   ├── index.html           # SPA entry point (Dashboard + Status + Settings)
+│   ├── config.html          # Configuration page (legacy, redirects to index.html)
+│   ├── src/                 # JavaScript/CSS sources
+│   │   ├── main.js          # Entry point & initialization
+│   │   ├── app.js           # Main application class (MultiGeigerApp)
+│   │   └── style.css        # Responsive UI styles
+│   ├── public/              # Static assets
+│   │   └── mock/api.js      # Mock API for local development
+│   ├── vite.config.js       # Vite build configuration
+│   └── package.json         # Web dependencies
 ├── docs/                    # Sphinx documentation
 │   ├── source/              # reStructuredText files
 │   ├── images/              # Screenshots
