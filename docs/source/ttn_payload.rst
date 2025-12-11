@@ -171,4 +171,4 @@ Decoded fields
 HTTP integration
 ----------------
 
-HTTP integration to sensor.community is provided via the webhook service ``https://ttn2luft.citysensor.de``. The LoRa payload is transformed server side into the sensor.community format.
+Legacy note: previously this payload was forwarded to sensor.community via the webhook service ``https://ttn2luft.citysensor.de``. That external service is no longer maintained.

@@ -17,6 +17,8 @@ Config::Config() {
 }
 
 void Config::setDefaults() {
+    log(INFO, "[CONFIG DEBUG] Setting default values...");
+
     // Build default device name from chip ID
     uint32_t chipId = (uint32_t)ESP.getEfuseMac();
     snprintf(deviceName, DEVICE_NAME_LEN, "MultiGeiger-%06X", chipId & 0xFFFFFF);
@@ -27,14 +29,11 @@ void Config::setDefaults() {
     wifiPassword[0] = '\0';
 
     // Misc settings
-    playSound = PLAY_SOUND;
     speakerTick = SPEAKER_TICK;
     ledTick = LED_TICK;
     showDisplay = SHOW_DISPLAY;
 
     // Transmission settings
-    sendToCommunity = SEND2SENSORCOMMUNITY;
-    sendToMadavi = SEND2MADAVI;
     sendToBle = SEND2BLE;
 
     // LoRa settings
@@ -59,8 +58,16 @@ void Config::setDefaults() {
     localAlarmFactor = LOCAL_ALARM_FACTOR;
 
     // HTTP Auth settings
+    log(INFO, "[CONFIG DEBUG] Setting HTTP Auth defaults from defines:");
+    log(INFO, "[CONFIG DEBUG]   HTTP_AUTH_USER = '%s'", HTTP_AUTH_USER);
+    log(INFO, "[CONFIG DEBUG]   HTTP_AUTH_PASS = '%s'", HTTP_AUTH_PASS);
+
     strncpy(httpAuthUser, HTTP_AUTH_USER, HTTP_AUTH_LEN);
     strncpy(httpAuthPass, HTTP_AUTH_PASS, HTTP_AUTH_LEN);
+
+    log(INFO, "[CONFIG DEBUG] After strncpy:");
+    log(INFO, "[CONFIG DEBUG]   httpAuthUser = '%s' (len=%d)", httpAuthUser, strlen(httpAuthUser));
+    log(INFO, "[CONFIG DEBUG]   httpAuthPass = '%s' (len=%d)", httpAuthPass, strlen(httpAuthPass));
 }
 
 ConfigService::ConfigService() {
@@ -78,15 +85,27 @@ bool ConfigService::begin() {
     }
 
     log(INFO, "ConfigService initialized");
+    log(INFO, "[CONFIG DEBUG] Checking NVS state...");
 
     // Check if this is first boot (no config saved)
-    if (!prefs.isKey("deviceName")) {
+    bool hasDeviceName = prefs.isKey("deviceName");
+    bool hasHttpAuthUser = prefs.isKey("httpAuthUser");
+    bool hasHttpAuthPass = prefs.isKey("httpAuthPass");
+
+    log(INFO, "[CONFIG DEBUG] NVS keys present:");
+    log(INFO, "[CONFIG DEBUG]   deviceName: %s", hasDeviceName ? "YES" : "NO");
+    log(INFO, "[CONFIG DEBUG]   httpAuthUser: %s", hasHttpAuthUser ? "YES" : "NO");
+    log(INFO, "[CONFIG DEBUG]   httpAuthPass: %s", hasHttpAuthPass ? "YES" : "NO");
+
+    if (!hasDeviceName) {
         log(INFO, "First boot detected, initializing with defaults");
+        log(INFO, "[CONFIG DEBUG] Calling reset() to set defaults");
         reset();
         return true;
     }
 
     // Load configuration
+    log(INFO, "[CONFIG DEBUG] Not first boot, loading existing config");
     if (!load()) {
         log(WARNING, "Failed to load config, using defaults");
         reset();
@@ -97,6 +116,20 @@ bool ConfigService::begin() {
 }
 
 bool ConfigService::load() {
+    log(INFO, "[CONFIG DEBUG] Loading configuration from NVS...");
+
+    // DEBUG: Check if auth keys exist before loading
+    bool userKeyExists = prefs.isKey("httpAuthUser");
+    bool passKeyExists = prefs.isKey("httpAuthPass");
+    log(INFO, "[CONFIG DEBUG] NVS key 'httpAuthUser' exists: %s", userKeyExists ? "YES" : "NO");
+    log(INFO, "[CONFIG DEBUG] NVS key 'httpAuthPass' exists: %s", passKeyExists ? "YES" : "NO");
+
+    // DEBUG: Show buffer state before getString
+    log(INFO, "[CONFIG DEBUG] Before load - httpAuthUser buffer: '%s' (first_byte=%d)",
+        config.httpAuthUser, (int)config.httpAuthUser[0]);
+    log(INFO, "[CONFIG DEBUG] Before load - httpAuthPass buffer: '%s' (first_byte=%d)",
+        config.httpAuthPass, (int)config.httpAuthPass[0]);
+
     // WiFi settings
     prefs.getString("deviceName", config.deviceName, DEVICE_NAME_LEN);
     prefs.getString("apPassword", config.apPassword, AP_PASS_LEN);
@@ -104,14 +137,11 @@ bool ConfigService::load() {
     prefs.getString("wifiPassword", config.wifiPassword, WIFI_PASS_LEN);
 
     // Misc settings
-    config.playSound = prefs.getBool("playSound", PLAY_SOUND);
     config.speakerTick = prefs.getBool("speakerTick", SPEAKER_TICK);
     config.ledTick = prefs.getBool("ledTick", LED_TICK);
     config.showDisplay = prefs.getBool("showDisplay", SHOW_DISPLAY);
 
     // Transmission settings
-    config.sendToCommunity = prefs.getBool("sendToCommunity", SEND2SENSORCOMMUNITY);
-    config.sendToMadavi = prefs.getBool("sendToMadavi", SEND2MADAVI);
     config.sendToBle = prefs.getBool("sendToBle", SEND2BLE);
 
     // LoRa settings
@@ -136,14 +166,26 @@ bool ConfigService::load() {
     config.localAlarmFactor = prefs.getInt("alarmFactor", LOCAL_ALARM_FACTOR);
 
     // HTTP Auth settings
-    prefs.getString("httpAuthUser", config.httpAuthUser, HTTP_AUTH_LEN);
-    prefs.getString("httpAuthPass", config.httpAuthPass, HTTP_AUTH_LEN);
+    size_t userLen = prefs.getString("httpAuthUser", config.httpAuthUser, HTTP_AUTH_LEN);
+    size_t passLen = prefs.getString("httpAuthPass", config.httpAuthPass, HTTP_AUTH_LEN);
+
+    // DEBUG: Show what was loaded
+    log(INFO, "[CONFIG DEBUG] After load - httpAuthUser: '%s' (len=%d, bytes_read=%d, first_byte=%d)",
+        config.httpAuthUser, strlen(config.httpAuthUser), userLen, (int)config.httpAuthUser[0]);
+    log(INFO, "[CONFIG DEBUG] After load - httpAuthPass: '%s' (len=%d, bytes_read=%d, first_byte=%d)",
+        config.httpAuthPass, strlen(config.httpAuthPass), passLen, (int)config.httpAuthPass[0]);
 
     log(INFO, "Configuration loaded from NVS");
     return true;
 }
 
 bool ConfigService::save() {
+    log(INFO, "[CONFIG DEBUG] Saving configuration to NVS...");
+    log(INFO, "[CONFIG DEBUG] Will save httpAuthUser: '%s' (len=%d)",
+        config.httpAuthUser, strlen(config.httpAuthUser));
+    log(INFO, "[CONFIG DEBUG] Will save httpAuthPass: '%s' (len=%d)",
+        config.httpAuthPass, strlen(config.httpAuthPass));
+
     // WiFi settings
     prefs.putString("deviceName", config.deviceName);
     prefs.putString("apPassword", config.apPassword);
@@ -151,14 +193,11 @@ bool ConfigService::save() {
     prefs.putString("wifiPassword", config.wifiPassword);
 
     // Misc settings
-    prefs.putBool("playSound", config.playSound);
     prefs.putBool("speakerTick", config.speakerTick);
     prefs.putBool("ledTick", config.ledTick);
     prefs.putBool("showDisplay", config.showDisplay);
 
     // Transmission settings
-    prefs.putBool("sendToCommunity", config.sendToCommunity);
-    prefs.putBool("sendToMadavi", config.sendToMadavi);
     prefs.putBool("sendToBle", config.sendToBle);
 
     // LoRa settings
@@ -183,8 +222,11 @@ bool ConfigService::save() {
     prefs.putInt("alarmFactor", config.localAlarmFactor);
 
     // HTTP Auth settings
-    prefs.putString("httpAuthUser", config.httpAuthUser);
-    prefs.putString("httpAuthPass", config.httpAuthPass);
+    size_t userBytes = prefs.putString("httpAuthUser", config.httpAuthUser);
+    size_t passBytes = prefs.putString("httpAuthPass", config.httpAuthPass);
+
+    log(INFO, "[CONFIG DEBUG] Saved httpAuthUser: %d bytes", userBytes);
+    log(INFO, "[CONFIG DEBUG] Saved httpAuthPass: %d bytes", passBytes);
 
     log(INFO, "Configuration saved to NVS");
     return true;

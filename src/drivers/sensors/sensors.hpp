@@ -25,7 +25,7 @@
  * @brief Geiger-Müller tube type definition
  */
 typedef struct {
-  const char *type;          ///< Tube type string for sensor.community API
+  const char *type;          ///< Tube type string (legacy API identifier)
   const char nbr;            ///< Tube type number for LoRa transmission
   const float cps_to_uSvph;  ///< Conversion factor: counts/sec to µSievert/hour
 } TUBETYPE;

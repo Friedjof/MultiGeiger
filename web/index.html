@@ -129,32 +129,6 @@
               </div>
             </div>
 
-            <div class="card status-tile" id="tile-community">
-              <div class="tile-header">
-                <div class="tile-top">
-                  <span class="tile-icon">🌍</span>
-                  <span class="tile-title">sensor.community</span>
-                </div>
-                <span class="tile-status" id="community-status">inactive</span>
-              </div>
-              <div class="tile-body">
-                <div class="tile-info" id="community-info">Disabled</div>
-              </div>
-            </div>
-
-            <div class="card status-tile" id="tile-madavi">
-              <div class="tile-header">
-                <div class="tile-top">
-                  <span class="tile-icon">📊</span>
-                  <span class="tile-title">madavi.de</span>
-                </div>
-                <span class="tile-status" id="madavi-status">inactive</span>
-              </div>
-              <div class="tile-body">
-                <div class="tile-info" id="madavi-info">Disabled</div>
-              </div>
-            </div>
-
             <div class="card status-tile" id="tile-ble">
               <div class="tile-header">
                 <div class="tile-top">
@@ -253,11 +227,6 @@
                 <summary>Device</summary>
                 <div class="accordion-body">
                   <label class="toggle">
-                    <input type="checkbox" id="startSound" name="startSound" />
-                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    <span class="toggle-label">Start sound</span>
-                  </label>
-                  <label class="toggle">
                     <input type="checkbox" id="speakerTick" name="speakerTick" />
                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
                     <span class="toggle-label">Speaker tick</span>
@@ -278,16 +247,6 @@
               <details class="accordion">
                 <summary>Transmission</summary>
                 <div class="accordion-body">
-                  <label class="toggle">
-                    <input type="checkbox" id="sendToCommunity" name="sendToCommunity" />
-                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    <span class="toggle-label">Send to sensor.community</span>
-                  </label>
-                  <label class="toggle">
-                    <input type="checkbox" id="sendToMadavi" name="sendToMadavi" />
-                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    <span class="toggle-label">Send to madavi.de</span>
-                  </label>
                   <label class="toggle">
                     <input type="checkbox" id="sendToBle" name="sendToBle" />
                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -378,6 +337,24 @@
                   </label>
                 </div>
               </details>
+
+              <details class="accordion">
+                <summary>Authorization</summary>
+                <div class="accordion-body">
+                  <label class="field">
+                    <span>Username</span>
+                    <input id="httpAuthUser" name="httpAuthUser" type="text" required />
+                  </label>
+                  <label class="field">
+                    <span>New password</span>
+                    <input id="httpAuthPassword" name="httpAuthPassword" type="password" placeholder="Leave blank to keep current" />
+                  </label>
+                  <label class="field">
+                    <span>Confirm new password</span>
+                    <input id="httpAuthPasswordConfirm" name="httpAuthPasswordConfirm" type="password" placeholder="Repeat new password" />
+                  </label>
+                </div>
+              </details>
             </form>
           </div>
 
@@ -405,6 +382,31 @@
           <a id="uiVersionFooter" href="#" target="_blank" rel="noopener">—</a>
         </footer>
       </main>
+    </div>
+
+    <div id="loginModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-card">
+        <div class="modal-title">Sign in</div>
+        <div id="loginMessage" class="modal-subtitle">
+          Enter admin credentials to edit settings.
+        </div>
+        <form id="loginForm" class="modal-form">
+          <label class="field">
+            <span>Username</span>
+            <input id="loginUsername" name="username" type="text" autocomplete="username" />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="loginPassword" name="password" type="password" autocomplete="current-password" />
+          </label>
+          <div id="loginError" class="banner error hidden"></div>
+          <div class="modal-actions">
+            <button id="loginCancel" type="button" class="ghost">Cancel</button>
+            <button id="loginSubmit" type="submit" class="primary">Sign in</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <script type="module" src="/src/main.js"></script>

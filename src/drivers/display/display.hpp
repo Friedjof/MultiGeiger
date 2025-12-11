@@ -31,14 +31,14 @@
 #define ST_WIFI_CONNECTING 3
 #define ST_WIFI_AP 4
 
-#define STATUS_SCOMM 1
+#define STATUS_SCOMM 1    // unused legacy slot
 #define ST_SCOMM_OFF 0
 #define ST_SCOMM_IDLE 1
 #define ST_SCOMM_ERROR 2
 #define ST_SCOMM_SENDING 3
 #define ST_SCOMM_INIT 4
 
-#define STATUS_MADAVI 2
+#define STATUS_MADAVI 2   // unused legacy slot
 #define ST_MADAVI_OFF 0
 #define ST_MADAVI_IDLE 1
 #define ST_MADAVI_ERROR 2
@@ -98,8 +98,8 @@ private:
                             ST_NODISPLAY, ST_NODISPLAY, ST_NODISPLAY, ST_NODISPLAY};
   const char *status_chars[STATUS_MAX] = {
     ".W0wA",  // WiFi
-    ".s1S?",  // sensor.community
-    ".m2M?",  // madavi
+    ".....",  // unused
+    ".....",  // unused
     ".t3T?",  // TTN
     ".B4b?",  // BLE
     ".",      // free

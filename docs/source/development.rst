@@ -70,7 +70,7 @@ Project layout
 - ``src/core``: logging, data logging helpers, UTC/clock helpers, ``VERSION_STR``.
 - ``src/config``: versioned defaults (``config.default.hpp``) and your local ``config.hpp``.
 - ``src/drivers``: hardware abstraction (IO + DIP switches + speaker/LED ticks, GM tube ISR + HV handling + THP sensors, OLED status/values, clock, board HAL).
-- ``src/comm``: WiFi config portal + HTTP uploads (sensor.community, madavi, custom), LoRa/TTN glue, BLE Heart-Rate notifications.
+- ``src/comm``: WiFi config portal, LoRa/TTN glue, BLE Heart-Rate notifications, MQTT publishing.
 - ``docs``: Sphinx sources (English master, translations via Transifex).
 
 Automatic Code Formatter

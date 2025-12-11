@@ -20,12 +20,9 @@ const DEFAULT_CONFIG = {
   apPassword: 'multigeiger',
   wifiSsid: 'MyNetwork',
   wifiPassword: '',
-  startSound: true,
   speakerTick: false,
   ledTick: true,
   showDisplay: true,
-  sendToCommunity: true,
-  sendToMadavi: true,
   sendToBle: false,
   sendToMqtt: false,
   mqttHost: 'mqtt.local',
@@ -43,9 +40,15 @@ const DEFAULT_CONFIG = {
   soundLocalAlarm: false,
   localAlarmThreshold: 0.5,
   localAlarmFactor: 10,
+  httpAuthUser: 'admin',
+  httpAuthPassword: '',
 };
 
 const POLL_STEP_SECONDS = 2;
+const DEFAULT_AUTH = {
+  username: 'admin',
+  password: 'admin',
+};
 
 function sleep(ms = 250) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,6 +79,29 @@ export class MockAPI {
     this.baseCounts = this.status.counts;
     this.cps = (this.status.cpm || 0) / 60;
     this.config = loadFromStorage('multigeiger:config', { ...DEFAULT_CONFIG });
+    this.auth = { ...DEFAULT_AUTH };
+    this.loggedIn = false;
+  }
+
+  unauthorized(message = 'Unauthorized') {
+    const err = new Error(message);
+    err.status = 401;
+    throw err;
+  }
+
+  requireAuth() {
+    if (!this.loggedIn) {
+      this.unauthorized();
+    }
+  }
+
+  async login(username, password) {
+    await sleep(100);
+    if (username === this.auth.username && password === this.auth.password) {
+      this.loggedIn = true;
+      return { status: 'ok' };
+    }
+    this.unauthorized('Invalid credentials');
   }
 
   async getStatus() {
@@ -105,10 +131,6 @@ export class MockAPI {
       mqtt_last_publish: (this.config.sendToMqtt && !isAPMode) ? recentTimestamp : null,
       lora_enabled: this.config.sendToLora,
       lora_last_send: this.config.sendToLora ? recentTimestamp : null,
-      community_enabled: this.config.sendToCommunity,
-      community_last_send: (this.config.sendToCommunity && !isAPMode) ? recentTimestamp : null,
-      madavi_enabled: this.config.sendToMadavi,
-      madavi_last_send: (this.config.sendToMadavi && !isAPMode) ? recentTimestamp : null,
       ble_enabled: this.config.sendToBle,
       ble_connections: this.config.sendToBle ? 0 : 0,
     };
@@ -130,23 +152,38 @@ export class MockAPI {
   }
 
   async getConfig() {
+    this.requireAuth();
     await sleep();
-    return { ...this.config };
+    return { ...this.config, httpAuthPassword: '' };
   }
 
   async saveConfig(data) {
-    this.config = { ...this.config, ...(data || {}) };
+    this.requireAuth();
+    const next = { ...data };
+    if (!next.httpAuthPassword) {
+      delete next.httpAuthPassword;
+    } else {
+      this.auth.password = next.httpAuthPassword;
+      next.httpAuthPassword = '';
+    }
+    if (next.httpAuthUser) {
+      this.auth.username = next.httpAuthUser;
+    }
+
+    this.config = { ...this.config, ...next };
     saveToStorage('multigeiger:config', this.config);
     await sleep();
     return { status: 'ok' };
   }
 
   async ping() {
+    this.requireAuth();
     await sleep(100);
     return { status: 'ok' };
   }
 
   async uploadFirmware() {
+    this.requireAuth();
     await sleep(600);
     return { status: 'ok' };
   }

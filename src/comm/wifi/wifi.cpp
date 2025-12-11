@@ -5,6 +5,7 @@
 #include "wifi.hpp"
 
 #include <string.h>
+#include <esp_system.h>
 
 #include "app/controller.hpp"
 #include "web_files.h"
@@ -18,6 +19,19 @@ extern MultiGeigerController controller;
 // Global instances
 WiFiService wifiService;
 WebServer server(80);
+
+// Simple session handling for config/OTA endpoints
+static const unsigned long SESSION_TTL_MS = 30UL * 60UL * 1000UL;  // 30 minutes
+static const unsigned long SESSION_TTL_SECONDS = SESSION_TTL_MS / 1000UL;
+static const int MAX_SESSIONS = 3;
+static const char* SESSION_COOKIE_NAME = "session";
+
+struct SessionToken {
+  String token;
+  unsigned long expiresAt;
+};
+
+static SessionToken sessions[MAX_SESSIONS];
 
 // CA Roots for LetsEncrypt Certificates (cross-signed):
 // - 1. ISRG Root X1 - valid until 2035-06-04
@@ -120,24 +134,7 @@ o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU
 rqXRfboQnoZsG4q5WTP468SQvvG5
 -----END CERTIFICATE-----
 )=====";
-// Hosts for data delivery
-
-// use http for now, could we use https?
-#define MADAVI "http://api-rrd.madavi.de/data.php"
-
-// use http for now, server operator tells there are performance issues with https.
-#define SENSORCOMMUNITY "http://api.sensor.community/v1/push-sensor-data/"
-
-// Send http(s) post requests to a custom server
-// Note: Custom toilet URLs from https://ptsv2.com/ can be used for debugging
-// and work with https and http.
-#define CUSTOMSRV "https://ptsv2.com/t/xxxxx-yyyyyyyyyy/post"
-// Get your own toilet URL and put it here before setting this to true.
-#define SEND2CUSTOMSRV false
-
-static String http_software_version;
 static unsigned int lora_software_version;
-static String chipID;
 static bool isLoraBoard;
 
 // Flags for scheduled restart (prevents ESP crash on config save)
@@ -150,24 +147,10 @@ static unsigned long lastConfigPingTime = 0;
 static const unsigned long CONFIG_PING_TIMEOUT_MS = 5000;  // 5 seconds
 
 // Timestamps for last successful transmissions (milliseconds since boot)
-static unsigned long lastMqttPublishTime = 0;
 static unsigned long lastLoRaSendTime = 0;
-static unsigned long lastCommunitySendTime = 0;
-static unsigned long lastMadaviSendTime = 0;
-
-typedef struct https_client {
-  WiFiClientSecure *wc;
-  HTTPClient *hc;
-} HttpsClient;
-
-static HttpsClient c_madavi, c_sensorc, c_customsrv;
 
 void setup_transmission(const char *version, char *ssid, bool loraHardware) {
-  chipID = String(ssid);
-  chipID.replace("ESP32", "esp32");
   isLoraBoard = loraHardware;
-
-  http_software_version = String(version);
 
   if (isLoraBoard) {
     int major, minor, patch;
@@ -176,21 +159,7 @@ void setup_transmission(const char *version, char *ssid, bool loraHardware) {
     setup_lorawan();
   }
 
-  c_madavi.wc = new WiFiClientSecure;
-  c_madavi.wc->setCACert(ca_certs);
-  c_madavi.hc = new HTTPClient;
-
-  c_sensorc.wc = new WiFiClientSecure;
-  c_sensorc.wc->setCACert(ca_certs);
-  c_sensorc.hc = new HTTPClient;
-
-  c_customsrv.wc = new WiFiClientSecure;
-  c_customsrv.wc->setCACert(ca_certs);
-  c_customsrv.hc = new HTTPClient;
-
   Config& cfg = configService.getConfig();
-  set_status(STATUS_SCOMM, cfg.sendToCommunity ? ST_SCOMM_INIT : ST_SCOMM_OFF);
-  set_status(STATUS_MADAVI, cfg.sendToMadavi ? ST_MADAVI_INIT : ST_MADAVI_OFF);
   set_status(STATUS_TTN, cfg.sendToLora ? ST_TTN_INIT : ST_TTN_OFF);
 }
 
@@ -240,136 +209,10 @@ void poll_transmission() {
   }
 }
 
-void prepare_http(HttpsClient *client, const char *host) {
-  if (host[4] == 's')  // https
-    client->hc->begin(*client->wc, host);
-  else  // http
-    client->hc->begin(host);
-  client->hc->addHeader("Content-Type", "application/json; charset=UTF-8");
-  client->hc->addHeader("Connection", "keep-alive");
-  client->hc->addHeader("X-Sensor", chipID);
-}
-
-int send_http(HttpsClient *client, String body) {
-  if (DEBUG_SERVER_SEND)
-    log(DEBUG, "http request body: %s", body.c_str());
-
-  int httpResponseCode = client->hc->POST(body);
-  if (httpResponseCode > 0) {
-    String response = client->hc->getString();
-    if (DEBUG_SERVER_SEND) {
-      log(DEBUG, "http code: %d", httpResponseCode);
-      log(DEBUG, "http response: %s", response.c_str());
-    }
-  } else {
-    log(ERROR, "Error on sending POST: %d", httpResponseCode);
-  }
-  client->hc->end();
-  return httpResponseCode;
-}
-
-int send_http_geiger(HttpsClient *client, const char *host, unsigned int timediff, unsigned int hv_pulses,
-                     unsigned int gm_counts, unsigned int cpm, int xpin) {
-  char body[1000];
-  prepare_http(client, host);
-  if (xpin != XPIN_NO_XPIN) {
-    client->hc->addHeader("X-PIN", String(xpin));
-  }
-  const char *json_format = R"=====(
-{
- "software_version": "%s",
- "sensordatavalues": [
-  {"value_type": "counts_per_minute", "value": "%d"},
-  {"value_type": "hv_pulses", "value": "%d"},
-  {"value_type": "counts", "value": "%d"},
-  {"value_type": "sample_time_ms", "value": "%d"}
- ]
-}
-)=====";
-  snprintf(body, 1000, json_format,
-           http_software_version.c_str(),
-           cpm,
-           hv_pulses,
-           gm_counts,
-           timediff);
-  return send_http(client, body);
-}
-
-int send_http_thp(HttpsClient *client, const char *host, float temperature, float humidity, float pressure, int xpin) {
-  char body[1000];
-  prepare_http(client, host);
-  if(xpin != XPIN_NO_XPIN) {
-    client->hc->addHeader("X-PIN", String(xpin));
-  }
-  const char *json_format = R"=====(
-{
- "software_version": "%s",
- "sensordatavalues": [
-  {"value_type": "temperature", "value": "%.2f"},
-  {"value_type": "humidity", "value": "%.2f"},
-  {"value_type": "pressure", "value": "%.2f"}
- ]
-}
-)=====";
-  snprintf(body, 1000, json_format,
-           http_software_version.c_str(),
-           temperature,
-           humidity,
-           pressure);
-  return send_http(client, body);
-}
-
-// two extra functions for MADAVI, because MADAVI needs the sensorname in value_type to recognize the sensors
-int send_http_geiger_2_madavi(HttpsClient *client, String tube_type, unsigned int timediff, unsigned int hv_pulses,
-                               unsigned int gm_counts, unsigned int cpm) {
-  char body[1000];
-  prepare_http(client, MADAVI);
-  tube_type = tube_type.substring(10);
-  const char *json_format = R"=====(
-{
- "software_version": "%s",
- "sensordatavalues": [
-  {"value_type": "%s_counts_per_minute", "value": "%d"},
-  {"value_type": "%s_hv_pulses", "value": "%d"},
-  {"value_type": "%s_counts", "value": "%d"},
-  {"value_type": "%s_sample_time_ms", "value": "%d"}
- ]
-}
-)=====";
-  snprintf(body, 1000, json_format,
-           http_software_version.c_str(),
-           tube_type.c_str(), cpm,
-           tube_type.c_str(), hv_pulses,
-           tube_type.c_str(), gm_counts,
-           tube_type.c_str(), timediff);
-  return send_http(client, body);
-}
-
-int send_http_thp_2_madavi(HttpsClient *client, float temperature, float humidity, float pressure) {
-  char body[1000];
-  prepare_http(client, MADAVI);
-  const char *json_format = R"=====(
-{
- "software_version": "%s",
- "sensordatavalues": [
-  {"value_type": "BME280_temperature", "value": "%.2f"},
-  {"value_type": "BME280_humidity", "value": "%.2f"},
-  {"value_type": "BME280_pressure", "value": "%.2f"}
- ]
-}
-)=====";
-  snprintf(body, 1000, json_format,
-           http_software_version.c_str(),
-           temperature,
-           humidity,
-           pressure);
-  return send_http(client, body);
-}
-
 // LoRa payload:
 // To minimise airtime and follow the 'TTN Fair Access Policy', we send all data in one message.
 // We do NOT use Cayenne LPP.
-// The payload will be translated via http integration and a small program to be compatible with sensor.community.
+// The payload stays compact for downstream decoders (e.g., TTN integrations).
 // For byte definitions see docs/source/ttn_payload.rst.
 //
 // Combined payload structure (18 bytes total):
@@ -439,60 +282,17 @@ int send_ttn_thp(float temperature, float humidity, float pressure) {
 
 void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
                    int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status) {
-  int rc1, rc2;
+  (void)wifi_status;  // WiFi state no longer gates transmissions
   Config& cfg = configService.getConfig();
 
-  #if SEND2CUSTOMSRV
-  bool customsrv_ok;
-  log(INFO, "Sending to CUSTOMSRV ...");
-  rc1 = send_http_geiger(&c_customsrv, CUSTOMSRV, dt, hv_pulses, gm_counts, cpm, XPIN_NO_XPIN);
-  rc2 = have_thp ? send_http_thp(&c_customsrv, CUSTOMSRV, temperature, humidity, pressure, XPIN_NO_XPIN) : 200;
-  customsrv_ok = (rc1 == 200) && (rc2 == 200);
-  log(INFO, "Sent to CUSTOMSRV, status: %s, http: %d %d", customsrv_ok ? "ok" : "error", rc1, rc2);
-  #endif
-
-  if(cfg.sendToMadavi && (wifi_status == ST_WIFI_CONNECTED)) {
-    bool madavi_ok;
-    log(INFO, "Sending to Madavi ...");
-    set_status(STATUS_MADAVI, ST_MADAVI_SENDING);
-    display_status();
-    rc1 = send_http_geiger_2_madavi(&c_madavi, tube_type, dt, hv_pulses, gm_counts, cpm);
-    rc2 = have_thp ? send_http_thp_2_madavi(&c_madavi, temperature, humidity, pressure) : 200;
-    delay(300);
-    madavi_ok = (rc1 == 200) && (rc2 == 200);
-    log(INFO, "Sent to Madavi, status: %s, http: %d %d", madavi_ok ? "ok" : "error", rc1, rc2);
-    set_status(STATUS_MADAVI, madavi_ok ? ST_MADAVI_IDLE : ST_MADAVI_ERROR);
-    if (madavi_ok) {
-      lastMadaviSendTime = millis();
-    }
-    display_status();
-  }
-
-  if(cfg.sendToCommunity && (wifi_status == ST_WIFI_CONNECTED)) {
-    bool scomm_ok;
-    log(INFO, "Sending to sensor.community ...");
-    set_status(STATUS_SCOMM, ST_SCOMM_SENDING);
-    display_status();
-    rc1 = send_http_geiger(&c_sensorc, SENSORCOMMUNITY, dt, hv_pulses, gm_counts, cpm, XPIN_RADIATION);
-    rc2 = have_thp ? send_http_thp(&c_sensorc, SENSORCOMMUNITY, temperature, humidity, pressure, XPIN_BME280) : 201;
-    delay(300);
-    scomm_ok = (rc1 == 201) && (rc2 == 201);
-    log(INFO, "Sent to sensor.community, status: %s, http: %d %d", scomm_ok ? "ok" : "error", rc1, rc2);
-    set_status(STATUS_SCOMM, scomm_ok ? ST_SCOMM_IDLE : ST_SCOMM_ERROR);
-    if (scomm_ok) {
-      lastCommunitySendTime = millis();
-    }
-    display_status();
-  }
-
-  if(isLoraBoard && cfg.sendToLora && (strcmp(cfg.devaddr, "") != 0)) {    // send only, if we have ABP credentials
+  if (isLoraBoard && cfg.sendToLora && (strcmp(cfg.devaddr, "") != 0)) {    // send only if we have ABP credentials
     bool ttn_ok;
     log(INFO, "Sending to TTN ...");
     log(INFO, "  - isLoraBoard: %d, sendToLora: %d, devaddr: %s", isLoraBoard, cfg.sendToLora, cfg.devaddr);
     set_status(STATUS_TTN, ST_TTN_SENDING);
     display_status();
     // Send combined message with GM + THP + Gas data in one transmission
-    rc1 = send_ttn_combined(tube_nbr, dt, gm_counts, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type);
+    int rc1 = send_ttn_combined(tube_nbr, dt, gm_counts, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type);
     log(INFO, "TTN send_ttn_combined result: %d (have_thp=%d, sensor_type=%d)", rc1, have_thp, sensor_type);
     ttn_ok = (rc1 == TX_STATUS_UPLINK_SUCCESS);
     log(INFO, "TTN transmission %s (rc=%d)", ttn_ok ? "SUCCESS" : "FAILED", rc1);
@@ -543,23 +343,164 @@ char *buildSSID() {
   return ssid;
 }
 
-/**
- * @brief Check HTTP Basic Authentication for protected endpoints
- * @return true if authenticated, false otherwise (sends 401 response)
- */
-bool checkHttpAuth(void) {
+// Session helpers ------------------------------------------------------------
+
+static String getJsonString(const String &body, const char *key) {
+  String needle = "\"" + String(key) + "\":\"";
+  int start = body.indexOf(needle);
+  if (start < 0) return "";
+  start += needle.length();
+  int end = body.indexOf("\"", start);
+  if (end < 0) return "";
+  return body.substring(start, end);
+}
+
+static void pruneSessions(void) {
+  unsigned long now = millis();
+  for (int i = 0; i < MAX_SESSIONS; ++i) {
+    if (sessions[i].token.length() == 0) continue;
+    if ((long)(sessions[i].expiresAt - now) <= 0) {
+      sessions[i].token = "";
+      sessions[i].expiresAt = 0;
+    }
+  }
+}
+
+static String generateSessionToken(void) {
+  char buf[9];  // 8 hex chars + null terminator
+  String token;
+  token.reserve(32);
+  for (int i = 0; i < 4; ++i) {  // 4 * 8 hex chars = 32 chars
+    uint32_t r = esp_random();
+    snprintf(buf, sizeof(buf), "%08lx", static_cast<unsigned long>(r));
+    token += buf;
+  }
+  if (token.length() > 32) {
+    token.remove(32);
+  }
+  return token;
+}
+
+static bool storeSessionToken(const String &token) {
+  unsigned long now = millis();
+  int target = -1;
+  unsigned long oldestRemaining = 0xFFFFFFFFUL;
+
+  for (int i = 0; i < MAX_SESSIONS; ++i) {
+    if (sessions[i].token.length() == 0) {
+      target = i;
+      break;
+    }
+
+    unsigned long remaining = sessions[i].expiresAt - now;
+    if ((long)remaining <= 0) {
+      target = i;
+      break;
+    }
+
+    if (remaining < oldestRemaining) {
+      oldestRemaining = remaining;
+      target = i;
+    }
+  }
+
+  if (target < 0) {
+    return false;
+  }
+
+  sessions[target].token = token;
+  sessions[target].expiresAt = now + SESSION_TTL_MS;
+  return true;
+}
+
+static String extractCookieValue(const String &cookieHeader, const char *name) {
+  if (cookieHeader.length() == 0) return "";
+
+  String needle = String(name) + "=";
+  int start = cookieHeader.indexOf(needle);
+  if (start < 0) return "";
+  start += needle.length();
+
+  int end = cookieHeader.indexOf(';', start);
+  if (end < 0) end = cookieHeader.length();
+
+  String value = cookieHeader.substring(start, end);
+  value.trim();
+  return value;
+}
+
+static String sessionTokenFromRequest(void) {
+  String cookieHeader = server.header("Cookie");
+  String token = extractCookieValue(cookieHeader, SESSION_COOKIE_NAME);
+  if (token.length() > 0) {
+    return token;
+  }
+
+  const String authHeader = server.header("Authorization");
+  const String bearerPrefix = "Bearer ";
+  if (authHeader.startsWith(bearerPrefix)) {
+    return authHeader.substring(bearerPrefix.length());
+  }
+
+  return "";
+}
+
+static bool validateSessionToken(const String &token) {
+  if (token.length() == 0) {
+    return false;
+  }
+
+  unsigned long now = millis();
+  for (int i = 0; i < MAX_SESSIONS; ++i) {
+    if (sessions[i].token.length() == 0) continue;
+
+    if (sessions[i].token == token) {
+      if ((long)(sessions[i].expiresAt - now) > 0) {
+        sessions[i].expiresAt = now + SESSION_TTL_MS;  // Sliding expiration
+        return true;
+      }
+
+      sessions[i].token = "";
+      sessions[i].expiresAt = 0;
+      return false;
+    }
+  }
+
+  return false;
+}
+
+static bool hasValidSession(void) {
   // Skip auth when in AP mode - WiFi password is sufficient authentication
   WiFiState state = wifiService.getState();
   if (state == WIFI_STATE_AP_MODE || state == WIFI_STATE_BOOT) {
     return true;
   }
 
-  Config& cfg = configService.getConfig();
-  if (!server.authenticate(cfg.httpAuthUser, cfg.httpAuthPass)) {
-    server.requestAuthentication(BASIC_AUTH, "MultiGeiger Config", "Authentication required");
-    return false;
+  pruneSessions();
+  String token = sessionTokenFromRequest();
+  return validateSessionToken(token);
+}
+
+static void clearSessions(void) {
+  for (int i = 0; i < MAX_SESSIONS; ++i) {
+    sessions[i].token = "";
+    sessions[i].expiresAt = 0;
   }
-  return true;
+}
+
+/**
+ * @brief Check session authentication for protected endpoints
+ * @return true if authenticated, false otherwise (sends 401 response)
+ */
+bool checkHttpAuth(bool sendResponse = true) {
+  if (hasValidSession()) {
+    return true;
+  }
+
+  if (sendResponse) {
+    server.send(401, "application/json", "{\"status\":\"unauthorized\",\"message\":\"Login required\"}");
+  }
+  return false;
 }
 
 // Rate limiting for config POSTs
@@ -597,6 +538,82 @@ bool checkRateLimit(void) {
   lastConfigPostTime = now;
   configPostAttempts++;
   return true;
+}
+
+/**
+ * @brief Login endpoint: validates credentials and sets a session cookie.
+ */
+void handleAuthLogin(void) {
+  pruneSessions();
+
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Request body missing\"}");
+    return;
+  }
+
+  String body = server.arg("plain");
+  String username = getJsonString(body, "username");
+  String password = getJsonString(body, "password");
+
+  // DEBUG: Log received credentials
+  log(INFO, "[AUTH DEBUG] Received login attempt");
+  log(INFO, "[AUTH DEBUG] Request body: %s", body.c_str());
+  log(INFO, "[AUTH DEBUG] Parsed username: '%s' (len=%d)", username.c_str(), username.length());
+  log(INFO, "[AUTH DEBUG] Parsed password: '%s' (len=%d)", password.c_str(), password.length());
+
+  Config& cfg = configService.getConfig();
+
+  // DEBUG: Log stored credentials
+  log(INFO, "[AUTH DEBUG] Stored httpAuthUser: '%s' (len=%d, first_byte=%d)",
+      cfg.httpAuthUser, strlen(cfg.httpAuthUser), (int)cfg.httpAuthUser[0]);
+  log(INFO, "[AUTH DEBUG] Stored httpAuthPass: '%s' (len=%d, first_byte=%d)",
+      cfg.httpAuthPass, strlen(cfg.httpAuthPass), (int)cfg.httpAuthPass[0]);
+
+  // Safety net: if stored credentials are empty (old config), restore defaults
+  if (cfg.httpAuthUser[0] == '\0' || cfg.httpAuthPass[0] == '\0') {
+    log(WARNING, "[AUTH DEBUG] Credentials are empty, restoring defaults");
+    strncpy(cfg.httpAuthUser, HTTP_AUTH_USER, HTTP_AUTH_LEN);
+    cfg.httpAuthUser[HTTP_AUTH_LEN - 1] = '\0';
+    strncpy(cfg.httpAuthPass, HTTP_AUTH_PASS, HTTP_AUTH_LEN);
+    cfg.httpAuthPass[HTTP_AUTH_LEN - 1] = '\0';
+    configService.save();
+    log(WARNING, "HTTP auth creds were empty - restored defaults");
+    log(INFO, "[AUTH DEBUG] After restore - httpAuthUser: '%s', httpAuthPass: '%s'",
+        cfg.httpAuthUser, cfg.httpAuthPass);
+  }
+
+  // DEBUG: Log comparison
+  String storedUser = String(cfg.httpAuthUser);
+  String storedPass = String(cfg.httpAuthPass);
+  log(INFO, "[AUTH DEBUG] Comparison:");
+  log(INFO, "[AUTH DEBUG]   username '%s' vs stored '%s' -> %s",
+      username.c_str(), storedUser.c_str(),
+      (username == storedUser) ? "MATCH" : "MISMATCH");
+  log(INFO, "[AUTH DEBUG]   password '%s' vs stored '%s' -> %s",
+      password.c_str(), storedPass.c_str(),
+      (password == storedPass) ? "MATCH" : "MISMATCH");
+
+  if (username != String(cfg.httpAuthUser) || password != String(cfg.httpAuthPass)) {
+    log(WARNING, "Login failed for user %s", username.c_str());
+    log(WARNING, "[AUTH DEBUG] Login REJECTED");
+    server.send(401, "application/json", "{\"status\":\"unauthorized\",\"message\":\"Invalid credentials\"}");
+    return;
+  }
+
+  log(INFO, "[AUTH DEBUG] Login ACCEPTED");
+
+  String token = generateSessionToken();
+  if (!storeSessionToken(token)) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Could not create session\"}");
+    return;
+  }
+
+  String cookie = String(SESSION_COOKIE_NAME) + "=" + token +
+                  "; Path=/; Max-Age=" + String(SESSION_TTL_SECONDS) +
+                  "; HttpOnly; SameSite=Lax";
+  server.sendHeader("Set-Cookie", cookie);
+  log(INFO, "Session created for user %s", username.c_str());
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 /**
@@ -826,22 +843,6 @@ void handleApiStatus(void) {
     json += ",\"lora_enabled\":" + String(configService.getConfig().sendToLora ? "true" : "false");
   }
 
-  // sensor.community status
-  if (lastCommunitySendTime > 0) {
-    json += ",\"community_enabled\":true";
-    json += ",\"community_last_send\":" + String(lastCommunitySendTime);
-  } else {
-    json += ",\"community_enabled\":" + String(configService.getConfig().sendToCommunity ? "true" : "false");
-  }
-
-  // madavi.de status
-  if (lastMadaviSendTime > 0) {
-    json += ",\"madavi_enabled\":true";
-    json += ",\"madavi_last_send\":" + String(lastMadaviSendTime);
-  } else {
-    json += ",\"madavi_enabled\":" + String(configService.getConfig().sendToMadavi ? "true" : "false");
-  }
-
   // BLE status
   int bleConnections = controller.getBle().getConnectedCount();
   json += ",\"ble_enabled\":" + String(configService.getConfig().sendToBle ? "true" : "false");
@@ -916,18 +917,13 @@ void handleRoot(void) {  // Handle web requests to "/" path.
 }
 
 void handleConfigPage(void) {
-  // Check authentication
-  if (!checkHttpAuth()) {
-    return;  // Auth failed, 401 response already sent
+  // Serve the UI shell without forcing auth, so the login dialog can be shown.
+  // If a valid session already exists, disable ticks immediately.
+  if (checkHttpAuth(false)) {
+    tick_enable(false);
+    configPageActive = true;
+    lastConfigPingTime = millis();
   }
-
-  // Disable ticking while accessing the config page to avoid exceptions
-  // when accessing flash memory (firmware update or config save).
-  // Ticks will be re-enabled when config is saved (see configSaved()) or
-  // when the heartbeat timeout expires (see poll_transmission()).
-  tick_enable(false);
-  configPageActive = true;
-  lastConfigPingTime = millis();
 
   // Serve config page
   if (!sendWebAsset("/index.html")) {
@@ -994,16 +990,15 @@ void handleGetConfig(void) {
   json += "\"apPassword\":\"********\",";  // Don't expose actual password
   json += "\"wifiSsid\":\"" + String(cfg.wifiSsid) + "\",";
   json += "\"wifiPassword\":\"\",";  // Don't expose actual password
+  json += "\"httpAuthUser\":\"" + String(cfg.httpAuthUser) + "\",";
+  json += "\"httpAuthPassword\":\"\",";
 
   // Misc settings
-  json += "\"startSound\":" + String(cfg.playSound ? "true" : "false") + ",";
   json += "\"speakerTick\":" + String(cfg.speakerTick ? "true" : "false") + ",";
   json += "\"ledTick\":" + String(cfg.ledTick ? "true" : "false") + ",";
   json += "\"showDisplay\":" + String(cfg.showDisplay ? "true" : "false") + ",";
 
   // Transmission settings
-  json += "\"sendToCommunity\":" + String(cfg.sendToCommunity ? "true" : "false") + ",";
-  json += "\"sendToMadavi\":" + String(cfg.sendToMadavi ? "true" : "false") + ",";
   json += "\"sendToBle\":" + String(cfg.sendToBle ? "true" : "false") + ",";
 
   // MQTT settings
@@ -1063,6 +1058,7 @@ void handlePostConfig(void) {
   log(INFO, "Received config update (%d bytes)", body.length());
 
   Config& cfg = configService.getConfig();
+  bool authChanged = false;
 
   // Parse JSON manually (simple approach - ESP32 can use ArduinoJson if needed)
   int idx;
@@ -1113,13 +1109,69 @@ void handlePostConfig(void) {
     }
   }
 
+  // HTTP auth settings
+  idx = body.indexOf("\"httpAuthUser\":\"");
+  if (idx >= 0) {
+    log(INFO, "[CONFIG DEBUG] Found httpAuthUser in request at idx=%d", idx);
+    const char *key = "\"httpAuthUser\":\"";
+    int start = idx + strlen(key);
+    int end = body.indexOf("\"", start);
+    log(INFO, "[CONFIG DEBUG] Parsing: start=%d, end=%d", start, end);
+
+    // DEBUG: Show what we're extracting
+    int needleLen = strlen(key);
+    log(INFO, "[CONFIG DEBUG] Needle: '%s' (len=%d)", key, needleLen);
+    log(INFO, "[CONFIG DEBUG] Using offset: %d (FIXED!)", needleLen);
+
+    if (end > start) {
+      String val = body.substring(start, end);
+      log(INFO, "[CONFIG DEBUG] Extracted httpAuthUser value: '%s' (len=%d)", val.c_str(), val.length());
+      log(INFO, "[CONFIG DEBUG] Current stored value: '%s'", cfg.httpAuthUser);
+
+      if (val.length() > 0) {
+        if (validateString(val, HTTP_AUTH_LEN)) {
+          if (val != String(cfg.httpAuthUser)) {
+            log(INFO, "[CONFIG DEBUG] httpAuthUser changed, updating from '%s' to '%s'",
+                cfg.httpAuthUser, val.c_str());
+            strncpy(cfg.httpAuthUser, val.c_str(), HTTP_AUTH_LEN);
+            cfg.httpAuthUser[HTTP_AUTH_LEN - 1] = '\0';
+            log(INFO, "[CONFIG DEBUG] After strncpy: '%s'", cfg.httpAuthUser);
+            authChanged = true;
+          } else {
+            log(INFO, "[CONFIG DEBUG] httpAuthUser unchanged");
+          }
+        } else if (val.length() >= HTTP_AUTH_LEN) {
+          log(WARNING, "httpAuthUser too long, ignoring");
+        }
+      }
+    }
+  }
+
+  idx = body.indexOf("\"httpAuthPassword\":\"");
+  if (idx >= 0) {
+    const char *key = "\"httpAuthPassword\":\"";
+    int start = idx + strlen(key);
+    int end = body.indexOf("\"", start);
+    if (end > start) {
+      String val = body.substring(start, end);
+      if (val.length() == 0) {
+        // Empty string => do not change password
+      } else if (validateString(val, HTTP_AUTH_LEN)) {
+        if (val != String(cfg.httpAuthPass)) {
+          strncpy(cfg.httpAuthPass, val.c_str(), HTTP_AUTH_LEN);
+          cfg.httpAuthPass[HTTP_AUTH_LEN - 1] = '\0';
+          authChanged = true;
+        }
+      } else if (val.length() >= HTTP_AUTH_LEN) {
+        log(WARNING, "httpAuthPassword too long, ignoring");
+      }
+    }
+  }
+
   // Boolean settings - simple parse
-  cfg.playSound = body.indexOf("\"startSound\":true") >= 0;
   cfg.speakerTick = body.indexOf("\"speakerTick\":true") >= 0;
   cfg.ledTick = body.indexOf("\"ledTick\":true") >= 0;
   cfg.showDisplay = body.indexOf("\"showDisplay\":true") >= 0;
-  cfg.sendToCommunity = body.indexOf("\"sendToCommunity\":true") >= 0;
-  cfg.sendToMadavi = body.indexOf("\"sendToMadavi\":true") >= 0;
   cfg.sendToBle = body.indexOf("\"sendToBle\":true") >= 0;
   cfg.sendToMqtt = body.indexOf("\"sendToMqtt\":true") >= 0;
   cfg.mqttUseTls = body.indexOf("\"mqttUseTls\":true") >= 0;
@@ -1289,6 +1341,12 @@ void handlePostConfig(void) {
   configService.save();
   configSaved();
 
+  if (authChanged) {
+    clearSessions();
+    ArduinoOTA.setPassword(cfg.httpAuthPass);
+    log(INFO, "HTTP auth credentials changed - sessions cleared");
+  }
+
   // Send success response
   server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Configuration saved\"}");
 
@@ -1308,6 +1366,25 @@ void setup_webconf(bool loraHardware) {
   }
 
   Config& cfg = configService.getConfig();
+
+  // TEMPORARY FIX: Reset corrupted auth credentials to defaults
+  // TODO: Remove this code after credentials are fixed!
+  log(WARNING, "=== TEMPORARY AUTH RESET ACTIVE ===");
+  log(WARNING, "Current httpAuthUser: '%s' (len=%d)", cfg.httpAuthUser, strlen(cfg.httpAuthUser));
+  log(WARNING, "Current httpAuthPass: '%s' (len=%d)", cfg.httpAuthPass, strlen(cfg.httpAuthPass));
+
+  if (strcmp(cfg.httpAuthUser, HTTP_AUTH_USER) != 0 || strcmp(cfg.httpAuthPass, HTTP_AUTH_PASS) != 0) {
+    log(WARNING, "Auth credentials are corrupted! Resetting to defaults...");
+    strncpy(cfg.httpAuthUser, HTTP_AUTH_USER, HTTP_AUTH_LEN);
+    cfg.httpAuthUser[HTTP_AUTH_LEN - 1] = '\0';
+    strncpy(cfg.httpAuthPass, HTTP_AUTH_PASS, HTTP_AUTH_LEN);
+    cfg.httpAuthPass[HTTP_AUTH_LEN - 1] = '\0';
+    configService.save();
+    log(WARNING, "Auth credentials RESET to: user='%s', pass='%s'", cfg.httpAuthUser, cfg.httpAuthPass);
+    log(WARNING, "=== PLEASE REMOVE THIS TEMPORARY CODE AFTER VERIFYING LOGIN WORKS ===");
+  } else {
+    log(INFO, "Auth credentials are correct - no reset needed");
+  }
 
   // if we don't have LoRa hardware, do not send to LoRa
   if (!isLoraBoard) {
@@ -1373,6 +1450,9 @@ void setup_webconf(bool loraHardware) {
 
   // Enable CORS for API endpoints
   server.enableCORS(true);
+  // Collect headers we need to inspect (cookies, bearer tokens, client time)
+  const char *headerKeys[] = {"Cookie", "Authorization", "X-Client-Time"};
+  server.collectHeaders(headerKeys, sizeof(headerKeys) / sizeof(headerKeys[0]));
 
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
@@ -1380,6 +1460,7 @@ void setup_webconf(bool loraHardware) {
   server.on("/config", handleConfigPage);
   server.on("/config/", handleConfigPage);
   server.on("/api/status", handleApiStatus);
+  server.on("/api/auth/login", HTTP_POST, handleAuthLogin);
 
   // Config API endpoints
   server.on("/api/config", HTTP_GET, handleGetConfig);

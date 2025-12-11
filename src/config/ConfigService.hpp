@@ -32,14 +32,11 @@ public:
     char wifiPassword[WIFI_PASS_LEN];
 
     // Misc settings
-    bool playSound;
     bool speakerTick;
     bool ledTick;
     bool showDisplay;
 
     // Transmission settings
-    bool sendToCommunity;
-    bool sendToMadavi;
     bool sendToBle;
 
     // LoRa settings

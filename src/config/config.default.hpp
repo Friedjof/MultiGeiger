@@ -3,7 +3,7 @@
 
 #pragma once
 
-// TUBE_TYPE values (predefined at sensor.community, DO NOT CHANGE):
+// TUBE_TYPE values (predefined legacy values, DO NOT CHANGE):
 #define TUBE_UNKNOWN 0 // this can be used for experimenting with other GM tubes and has a 0 CPM to uSv/h conversion factor.
 #define SBM20 1
 #define SBM19 2
@@ -23,10 +23,6 @@
 // your serial logging style:
 #define SERIAL_DEBUG Serial_Logging
 
-// Server transmission debugging:
-// if set to true, print debug info on serial (USB) interface while sending to servers (madavi or sensor.community)
-#define DEBUG_SERVER_SEND true
-
 // Speaker Ticks with every pulse?
 #define SPEAKER_TICK true
 
@@ -35,18 +31,6 @@
 
 // Enable display?
 #define SHOW_DISPLAY true
-
-// Play a start sound at boot/reboot time?
-#define PLAY_SOUND true
-
-// Send to servers:
-// Send data to Madavi server?
-// Madavi should be used to see values in real time.
-#define SEND2MADAVI true
-
-// Send data to sensor.community server?
-// Should always be true so that the data is archived there. Standard server for devices without LoRa.
-#define SEND2SENSORCOMMUNITY true
 
 // Send data via MQTT?
 // Defaults for the WebUI; can be overridden and saved at runtime.
@@ -62,7 +46,6 @@
 
 // Send data via LoRa to TTN?
 // Only for devices with LoRa, automatically deactivated for devices without LoRa.
-// If this is set to true, sending to Madavi and sensor.community should be deactivated!
 // Note: The TTN configuration needs to be done in lorawan.cpp (starting at line 65).
 #define SEND2LORA false
 
@@ -96,11 +79,6 @@
 // LoRa timeout
 #define LORA_TIMEOUT_MS 30000L
 
-// WiFi/HTTP endpoints and behavior
-#define MADAVI_URL "http://api-rrd.madavi.de/data.php"
-#define SENSORCOMMUNITY_URL "http://api.sensor.community/v1/push-sensor-data/"
-#define CUSTOMSRV_URL "https://ptsv2.com/t/xxxxx-yyyyyyyyyy/post"
-#define SEND2CUSTOMSRV false
 #define CONFIG_VERSION "016"
 
 // HTTP Basic Auth for /config and /api/config endpoints

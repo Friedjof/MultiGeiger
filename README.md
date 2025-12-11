@@ -11,7 +11,7 @@ The MultiGeiger is an **ESP32-based radioactivity measurement device** designed 
 - 🌐 **Modern Web Interface** - Responsive dashboard with live updates and easy configuration
 - 📡 **Multiple Connectivity** - WiFi, LoRaWAN/TTN, BLE, MQTT with TLS support
 - 🌡️ **Environmental Sensors** - Optional temperature, humidity, and pressure monitoring (BMP280/BME280/BME680)
-- ☁️ **Cloud Integration** - Automatic upload to sensor.community, madavi.de, OpenSenseMap, and custom endpoints
+- ☁️ **Cloud Integration** - MQTT + TTN/LoRaWAN forwarding; direct HTTP uploads to sensor.community/madavi removed
 - 🔋 **Low Power Design** - Optimized for battery operation with deep sleep support
 
 ## 🚀 Quick Start
@@ -51,7 +51,6 @@ Standard 802.11 b/g/n connectivity for:
 
 - Web interface access
 - MQTT data publishing
-- HTTP uploads to sensor.community and madavi.de
 - OTA firmware updates
 
 ### LoRaWAN 🛰️
@@ -163,13 +162,7 @@ return [{ json: {
 
 ### Direct Uploads 📤
 
-MultiGeiger can directly upload to:
-
-- **sensor.community** (luftdaten.info): Particulate matter and radiation map
-- **madavi.de**: Long-term data archival and visualization
-- **Custom HTTP endpoints**: JSON POST with configurable headers
-
-See [Deployment Guide](docs/source/deployment.rst) for configuration details.
+Legacy HTTP uploads (sensor.community/madavi/custom) have been removed. Use MQTT or TTN/LoRaWAN forwarding pipelines for cloud ingestion.
 
 ## 🔧 Development & Building
 

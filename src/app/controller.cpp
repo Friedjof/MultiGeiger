@@ -25,7 +25,7 @@ void MultiGeigerController::begin() {
   switches_state = io.readSwitches();  // only read DIP switches once at boot time
   sensors.beginThp();
   wifi.beginWeb(isLoraBoard);
-  io.setupSpeaker(cfg.playSound, cfg.ledTick && switches_state.led_on, cfg.speakerTick && switches_state.speaker_on);
+  io.setupSpeaker(cfg.ledTick && switches_state.led_on, cfg.speakerTick && switches_state.speaker_on);
   wifi.beginTx(VERSION_STR, ssid, isLoraBoard);
   extern int mqttQos;  // From wifi.cpp
   MqttConfig mqttCfg{

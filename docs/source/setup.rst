@@ -13,9 +13,12 @@ Recommended toolchain: PlatformIO CLI (via the included ``Makefile``).
    Adjust ``src/config/config.hpp`` to your hardware. Important switches:
 
    - ``TUBE_TYPE``: SBM20, SBM19, Si22G.
-   - Network targets: ``SEND2SENSORCOMMUNITY``, ``SEND2MADAVI``, ``SEND2LORA``, ``SEND2BLE``.
-   - UI/alarms: ``SHOW_DISPLAY``, ``PLAY_SOUND``, ``SPEAKER_TICK``, ``LED_TICK``, ``LOCAL_ALARM_SOUND``, ``LOCAL_ALARM_THRESHOLD``, ``LOCAL_ALARM_FACTOR``.
-   - Debug: ``DEBUG_SERVER_SEND`` for HTTP request logging.
+   - Network targets: ``SEND2LORA``, ``SEND2BLE``.
+   - UI/alarms: ``SHOW_DISPLAY``, ``SPEAKER_TICK``, ``LED_TICK``, ``LOCAL_ALARM_SOUND``, ``LOCAL_ALARM_THRESHOLD``, ``LOCAL_ALARM_FACTOR``.
+   
+   .. note::
+
+      Direct HTTP uploads to sensor.community / madavi.de have been removed. Use BLE, MQTT, or TTN/LoRaWAN forwarding instead.
 
 3. Build/flash/monitor with the provided targets (default PlatformIO environment ``geiger`` uses the Heltec Wireless Stick board definition):
 
@@ -36,7 +39,7 @@ The firmware auto-detects LoRa hardware via ``HWTESTPIN`` and adjusts the displa
 
 Runtime DIP switches (read once at boot) combine with your compile-time flags:
 
-- SW0 ``speaker_on``: enable tick/alarm if ``SPEAKER_TICK``/``PLAY_SOUND`` allow it.
+- SW0 ``speaker_on``: enable tick/alarm if ``SPEAKER_TICK`` allows it.
 - SW1 ``display_on``: enable OLED if ``SHOW_DISPLAY`` is true.
 - SW2 ``led_on``: enable white LED tick if ``LED_TICK`` is true.
 - SW3 ``ble_on``: enable BLE advertising if ``SEND2BLE`` is true.
@@ -89,8 +92,7 @@ re-entered**. In future versions this step shall become obsolete.
 
 Furthermore, the following options can be defined on the settings page:
 
--  Start melody, speaker tick, LED tick and display on/off. **Note (firmware 1.18+):** These settings are now **applied immediately** after saving, without requiring a reboot. The settings respect DIP switch states (SW0=speaker, SW1=display, SW2=LED).
--  Send data to sensor.community or/and to madavi.de
+-  Speaker tick, LED tick and display on/off. **Note (firmware 1.18+):** These settings are now **applied immediately** after saving, without requiring a reboot. The settings respect DIP switch states (SW0=speaker, SW1=display, SW2=LED).
 -  MQTT broker configuration (host, port, TLS, credentials, topics)
 -  If LoRa hardware is available: the LoRa parameters (DEVEUI, APPEUI
    and APPKEY) can be entered here.
@@ -108,32 +110,9 @@ Enter **admin** as username and the chosen password (see above). Now you will se
 Server for measured data
 ########################
 
-The pulses are counted for one measuring cycle at a time, from which the “counts per minute” (cpm) are calculated. After each cycle the data is sent to the servers at *sensor.community* and at *madavi.de*.
-
-At *sensor.community* the data is stored and made available for retrieval the next day as CSV file.
-This file can be found at http://archive.sensor.community/DATE/DATE_radiation_si22g_sensor_SID.csv), where DATE = date in format YYYY-MM-DD (both times equal) and SID is the sensor number of the sensor (**not** the ChipID). For other sensors, replace the counting tube name **si22g** with the corresponding name (e.g.: sbm-20 or sbm-19).
-
-At *madavi* the data is stored in a RRD database and can be accessed directly as a graph via this link: https://www.madavi.de/sensor/graph.php?sensor=esp32-CHIPID-si22g.
-Here CHIPID is the ChipId (the digits of the SSID of the internal access point).
-
-During the transmission of the data to the servers, the name of the server is briefly shown in the status line (bottom line) of the display.
+Direct HTTP uploads to external services (sensor.community, madavi.de) have been removed. Use BLE, MQTT, or LoRa/TTN to export your measurements to your own backend.
 
 Login to sensor.community
 #########################
 
-In order to send the measuered data to sensor.community, it is mandatory to have a valid account and the sensor is registered. Both can be done at https://devices.sensor.community. Create an account if you do not have one via the *Register* button and log in. To register a new sensor click *Register new sensor*. Fill in the form: 
-
--  Sensor
-   ID: Enter the number (only the numbers) of the SSID of the sensor (e.g. for the sensor ESP-51564452 enter 51564452).
--  Sensor Board: Select *esp32* (by the small arrows on the right)
--  Basic information:
-   Enter the address and the country. The internal name of the sensor can be assigned arbitrarily, but must be entered. Please check **Indoor sensor** as long as the sensor operates not outdoor.
--  Additional information:
-   Can be left blank, but its nice to provide further information. 
--  Hardware configuration:
-   Select the sensor type **Radiation Si22G** (or accordingly). The value for the second sensor can remain DHT22, as it is irrelevant in this context.
--  Position:
-   Please enter the coordinates as accurate as possible. You can use the right button to calculate the coordinates. They are needed to show your sensor on the map.
-
-Finish the settings by clicking *Save settings*. At the overview page for this sensor go to *Data*. Here you see amongst others the ID of the sensor. Please remember: the ID mandatory for the queries at
-sensor.community or multigeiger.citysensor.de.
+Legacy-only: registering devices at sensor.community is no longer required because the firmware no longer uploads data there.

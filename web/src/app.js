@@ -40,6 +40,14 @@ function qs(id) {
   return document.getElementById(id);
 }
 
+class UnauthorizedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'UnauthorizedError';
+    this.status = 401;
+  }
+}
+
 export class MultiGeigerApp {
   constructor() {
     this.useMock = shouldUseMockFromQuery();
@@ -52,11 +60,15 @@ export class MultiGeigerApp {
     this.currentView = this.getInitialView();
     this.statusBadge = qs('statusBadge');
     this.uiVersion = qs('uiVersion');
+    this.configLoaded = false;
+    this.configLoading = false;
+    this.hasSession = false;
   }
 
   async init() {
     this.applyVersion();
     this.bindTabs();
+    this.bindLoginDialog();
     this.bindConfigForm();
     this.bindUploadForm();
     this.switchView(this.currentView, { skipHistory: true });
@@ -68,7 +80,6 @@ export class MultiGeigerApp {
     this.refreshStatus();
     this.startStatusPoll();
     this.startTimeSync();
-    this.loadConfig();
   }
 
   getInitialView() {
@@ -115,9 +126,27 @@ export class MultiGeigerApp {
     }
 
     if (view === 'settings') {
-      this.startHeartbeat();
+      void this.enterSettings();
     } else {
       this.stopHeartbeat();
+    }
+  }
+
+  async enterSettings() {
+    if (this.useMock) {
+      await this.loadConfig({ quiet: this.configLoaded });
+      this.startHeartbeat();
+      return;
+    }
+
+    if (this.configLoaded) {
+      this.startHeartbeat();
+      return;
+    }
+
+    const loaded = await this.loadConfig({ quiet: true });
+    if (loaded) {
+      this.startHeartbeat();
     }
   }
 
@@ -160,6 +189,7 @@ export class MultiGeigerApp {
     // Send browser time with every request for automatic sync
     const response = await fetch(path, {
       ...options,
+      credentials: options.credentials || 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         'X-Client-Time': Date.now().toString(),
@@ -169,7 +199,12 @@ export class MultiGeigerApp {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
+      if (response.status === 401) {
+        throw new UnauthorizedError(text || 'Unauthorized');
+      }
+      const err = new Error(text || `HTTP ${response.status}`);
+      err.status = response.status;
+      throw err;
     }
 
     const contentType = response.headers.get('content-type') || '';
@@ -186,25 +221,151 @@ export class MultiGeigerApp {
 
     const body = options.body ? JSON.parse(options.body) : undefined;
 
-    switch (path) {
-      case '/api/status':
-        return this.mockApi.getStatus();
-      case '/api/config':
-        if (options.method === 'POST') {
-          return this.mockApi.saveConfig(body);
-        }
-        return this.mockApi.getConfig();
-      case '/api/config/ping':
-        return this.mockApi.ping();
-      case '/update':
-        return this.mockApi.uploadFirmware(body?.file);
-      case '/api/time':
-        if (options.method === 'POST') {
-          return this.mockApi.setTime(body);
-        }
-        return this.mockApi.getTime();
-      default:
-        throw new Error(`Mock route not implemented: ${path}`);
+    try {
+      switch (path) {
+        case '/api/status':
+          return this.mockApi.getStatus();
+        case '/api/config':
+          if (options.method === 'POST') {
+            return this.mockApi.saveConfig(body);
+          }
+          return this.mockApi.getConfig();
+        case '/api/config/ping':
+          return this.mockApi.ping();
+        case '/update':
+          return this.mockApi.uploadFirmware(body?.file);
+        case '/api/auth/login':
+          return this.mockApi.login(body?.username, body?.password);
+        case '/api/time':
+          if (options.method === 'POST') {
+            return this.mockApi.setTime(body);
+          }
+          return this.mockApi.getTime();
+        default:
+          throw new Error(`Mock route not implemented: ${path}`);
+      }
+    } catch (err) {
+      if (err && err.status === 401) {
+        throw new UnauthorizedError(err.message || 'Unauthorized');
+      }
+      throw err;
+    }
+  }
+
+  bindLoginDialog() {
+    this.loginModal = qs('loginModal');
+    this.loginForm = qs('loginForm');
+    if (!this.loginForm) return;
+
+    const cancel = qs('loginCancel');
+    this.loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleLogin();
+    });
+    if (cancel) {
+      cancel.addEventListener('click', () => this.hideLogin());
+    }
+  }
+
+  showLogin(message = 'Please sign in to edit settings.') {
+    const modal = qs('loginModal');
+    const messageEl = qs('loginMessage');
+    if (messageEl) {
+      messageEl.textContent = message;
+    }
+    const errorEl = qs('loginError');
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.classList.add('hidden');
+    }
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  hideLogin() {
+    const modal = qs('loginModal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    const password = qs('loginPassword');
+    if (password) password.value = '';
+  }
+
+  setLoginError(message) {
+    const errorEl = qs('loginError');
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  }
+
+  requestLogin(message) {
+    this.hasSession = false;
+    this.configLoaded = false;
+    this.stopHeartbeat();
+    this.clearConfigForm();
+    this.showLogin(message);
+  }
+
+  clearConfigForm() {
+    const textFields = [
+      'thingName', 'apPassword', 'wifiSsid', 'wifiPassword',
+      'mqttHost', 'mqttPort', 'mqttUsername', 'mqttPassword', 'mqttBaseTopic',
+      'devaddr', 'nwkskey', 'appskey',
+      'localAlarmThreshold', 'localAlarmFactor',
+      'httpAuthUser', 'httpAuthPassword', 'httpAuthPasswordConfirm',
+    ];
+    textFields.forEach((id) => {
+      const el = qs(id);
+      if (el) el.value = '';
+    });
+
+    const checkboxes = [
+      'speakerTick', 'ledTick', 'showDisplay',
+      'sendToBle', 'sendToMqtt', 'sendToLora', 'soundLocalAlarm',
+      'mqttUseTls', 'mqttRetain',
+    ];
+    checkboxes.forEach((id) => {
+      const el = qs(id);
+      if (el) el.checked = false;
+    });
+
+    this.originalConfig = null;
+  }
+
+  async handleLogin() {
+    const username = qs('loginUsername')?.value.trim();
+    const password = qs('loginPassword')?.value;
+    const submit = qs('loginSubmit');
+    const cancel = qs('loginCancel');
+
+    if (!username || !password) {
+      this.setLoginError('Enter username and password');
+      return;
+    }
+
+    if (submit) submit.disabled = true;
+    if (cancel) cancel.disabled = true;
+
+    try {
+      await this.apiRequest('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      this.hasSession = true;
+      this.hideLogin();
+      this.showBanner('configStatus', 'Signed in', 'success');
+      const loaded = await this.loadConfig({ quiet: true });
+      if (loaded) {
+        this.startHeartbeat();
+      }
+    } catch (err) {
+      this.hasSession = false;
+      const message = err instanceof UnauthorizedError ? 'Invalid username or password' : 'Login failed';
+      this.setLoginError(message);
+    } finally {
+      if (submit) submit.disabled = false;
+      if (cancel) cancel.disabled = false;
     }
   }
 
@@ -357,14 +518,36 @@ export class MultiGeigerApp {
     }
   }
 
-  async loadConfig() {
+  async loadConfig(options = {}) {
+    const { quiet = false } = options;
+    if (this.configLoading) return false;
+
+    this.configLoading = true;
     try {
       const data = await this.apiRequest('/api/config');
+      this.hasSession = true;
+      this.configLoaded = true;
       this.populateConfigForm(data);
-      this.showBanner('configStatus', 'Configuration loaded', 'success');
+      if (!quiet) {
+        this.showBanner('configStatus', 'Configuration loaded', 'success');
+      }
+      return true;
     } catch (err) {
+      this.configLoaded = false;
+      if (err instanceof UnauthorizedError || err.status === 401) {
+        if (!quiet) {
+          this.showBanner('configStatus', 'Login required to load configuration', 'error');
+        }
+        this.requestLogin('Please sign in to edit settings.');
+        return false;
+      }
       console.error('Config load failed', err);
-      this.showBanner('configStatus', 'Failed to load configuration', 'error');
+      if (!quiet) {
+        this.showBanner('configStatus', 'Failed to load configuration', 'error');
+      }
+      return false;
+    } finally {
+      this.configLoading = false;
     }
   }
 
@@ -384,14 +567,15 @@ export class MultiGeigerApp {
     setVal('apPassword', cfg.apPassword);
     setVal('wifiSsid', cfg.wifiSsid);
     setVal('wifiPassword', cfg.wifiPassword);
+    setVal('httpAuthUser', cfg.httpAuthUser);
+    setVal('httpAuthPassword', '');
+    const confirm = qs('httpAuthPasswordConfirm');
+    if (confirm) confirm.value = '';
 
-    setCheckbox('startSound', cfg.startSound);
     setCheckbox('speakerTick', cfg.speakerTick);
     setCheckbox('ledTick', cfg.ledTick);
     setCheckbox('showDisplay', cfg.showDisplay);
 
-    setCheckbox('sendToCommunity', cfg.sendToCommunity);
-    setCheckbox('sendToMadavi', cfg.sendToMadavi);
     setCheckbox('sendToBle', cfg.sendToBle);
 
     setCheckbox('sendToMqtt', cfg.sendToMqtt);
@@ -432,12 +616,9 @@ export class MultiGeigerApp {
       apPassword: val('apPassword'),
       wifiSsid: val('wifiSsid'),
       wifiPassword: val('wifiPassword'),
-      startSound: checked('startSound'),
       speakerTick: checked('speakerTick'),
       ledTick: checked('ledTick'),
       showDisplay: checked('showDisplay'),
-      sendToCommunity: checked('sendToCommunity'),
-      sendToMadavi: checked('sendToMadavi'),
       sendToBle: checked('sendToBle'),
       sendToMqtt: checked('sendToMqtt'),
       mqttHost: val('mqttHost'),
@@ -450,6 +631,8 @@ export class MultiGeigerApp {
       soundLocalAlarm: checked('soundLocalAlarm'),
       localAlarmThreshold: Number(val('localAlarmThreshold')) || 0.5,
       localAlarmFactor: Number(val('localAlarmFactor')) || 10,
+      httpAuthUser: val('httpAuthUser'),
+      httpAuthPassword: val('httpAuthPassword'),
     };
 
     const loraGroup = qs('loraGroup');
@@ -470,6 +653,23 @@ export class MultiGeigerApp {
       return;
     }
 
+    const pwdInput = qs('httpAuthPassword');
+    const pwdConfirmInput = qs('httpAuthPasswordConfirm');
+    const pwd = pwdInput?.value ?? '';
+    const pwdConfirm = pwdConfirmInput?.value ?? '';
+
+    if (pwdInput) pwdInput.classList.remove('error');
+    if (pwdConfirmInput) pwdConfirmInput.classList.remove('error');
+
+    if (pwd || pwdConfirm) {
+      if (pwd !== pwdConfirm) {
+        this.showBanner('configStatus', 'Authorization passwords do not match', 'error');
+        if (pwdInput) pwdInput.classList.add('error');
+        if (pwdConfirmInput) pwdConfirmInput.classList.add('error');
+        return;
+      }
+    }
+
     const data = this.readConfigForm();
     const saveBtn = qs('saveConfig');
     if (saveBtn) saveBtn.disabled = true;
@@ -481,6 +681,10 @@ export class MultiGeigerApp {
       });
       this.showBanner('configStatus', 'Configuration saved. Device may restart.', 'success');
     } catch (err) {
+      if (err instanceof UnauthorizedError || err.status === 401) {
+        this.requestLogin('Session expired. Please sign in.');
+        return;
+      }
       console.error('Config save failed', err);
       this.showBanner('configStatus', err.message || 'Failed to save configuration', 'error');
     } finally {
@@ -496,6 +700,7 @@ export class MultiGeigerApp {
 
   startHeartbeat() {
     if (this.useMock) return;
+    if (!this.hasSession) return;
     this.stopHeartbeat();
     this.sendHeartbeat();
     this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), HEARTBEAT_MS);
@@ -510,6 +715,10 @@ export class MultiGeigerApp {
     try {
       await this.apiRequest('/api/config/ping', { method: 'POST' });
     } catch (err) {
+      if (err instanceof UnauthorizedError || err.status === 401) {
+        this.requestLogin('Session expired. Please sign in.');
+        return;
+      }
       console.warn('Heartbeat failed', err);
     }
   }
@@ -557,7 +766,11 @@ export class MultiGeigerApp {
       }
     } catch (err) {
       console.error('Upload failed', err);
-      alert(err.message || 'Upload failed');
+      if (err instanceof UnauthorizedError || err.status === 401) {
+        this.requestLogin('Session expired. Please sign in.');
+      } else {
+        alert(err.message || 'Upload failed');
+      }
       this.updateUploadProgress(0);
     } finally {
       if (button) button.disabled = false;
@@ -585,8 +798,12 @@ export class MultiGeigerApp {
           onProgress?.(100);
           alert('Firmware uploaded. Device will restart.');
           resolve();
+        } else if (xhr.status === 401) {
+          reject(new UnauthorizedError('Unauthorized'));
         } else {
-          reject(new Error(`Upload failed (${xhr.status})`));
+          const error = new Error(`Upload failed (${xhr.status})`);
+          error.status = xhr.status;
+          reject(error);
         }
       };
 
@@ -674,38 +891,6 @@ export class MultiGeigerApp {
     }
 
     this.setTileStatus('lora', loraEnabled ? 'active' : 'inactive', loraInfo);
-
-    // sensor.community status - needs internet
-    const communityEnabled = data.community_enabled || (this.originalConfig?.sendToCommunity);
-    let communityState = 'inactive';
-    let communityInfo = 'Disabled';
-
-    if (isAPMode && communityEnabled) {
-      communityInfo = 'No internet\n(AP mode)';
-    } else if (communityEnabled) {
-      communityState = 'active';
-      communityInfo = data.community_last_send
-        ? `Last upload:\n${this.formatTimestamp(data.community_last_send)}`
-        : 'No uploads yet';
-    }
-
-    this.setTileStatus('community', communityState, communityInfo);
-
-    // madavi.de status - needs internet
-    const madaviEnabled = data.madavi_enabled || (this.originalConfig?.sendToMadavi);
-    let madaviState = 'inactive';
-    let madaviInfo = 'Disabled';
-
-    if (isAPMode && madaviEnabled) {
-      madaviInfo = 'No internet\n(AP mode)';
-    } else if (madaviEnabled) {
-      madaviState = 'active';
-      madaviInfo = data.madavi_last_send
-        ? `Last upload:\n${this.formatTimestamp(data.madavi_last_send)}`
-        : 'No uploads yet';
-    }
-
-    this.setTileStatus('madavi', madaviState, madaviInfo);
 
     // BLE status - works locally
     const bleEnabled = data.ble_enabled || (this.originalConfig?.sendToBle);

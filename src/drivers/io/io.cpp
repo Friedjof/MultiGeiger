@@ -70,29 +70,6 @@ static DRAM_ATTR int alarm_sequence[][4] = {
   {0, 0, -1, 0},          // end
 };
 
-static DRAM_ATTR int init_sequence[][4] = {
-  {0, 0, 0, 0},  // speaker off, led off, end
-};
-
-static DRAM_ATTR int melody_sequence[][4] = {
-  {int(1174659 * 0.75), 1, -1, 2},  // D
-  {0, 0, -1, 2},                    // ---
-  {int(1318510 * 0.75), 1, -1, 2},  // E
-  {0, 0, -1, 2},                    // ---
-  {int(1479978 * 0.75), 1, -1, 2},  // Fis
-  {0, 0, -1, 2},                    // ---
-  {int(1567982 * 0.75), 1, -1, 4},  // G
-  {int(1174659 * 0.75), 1, -1, 2},  // D
-  {int(1318510 * 0.75), 1, -1, 2},  // E
-  {int(1174659 * 0.75), 1, -1, 4},  // D
-  {int(987767 * 0.75), 1, -1, 2},   // H
-  {int(1046502 * 0.75), 1, -1, 2},  // C
-  {int(987767 * 0.75), 1, -1, 4},   // H
-  {int(987767 * 0.75), 0, -1, 4},   // H
-  {0, 0, -1, 2},                    // ---
-  {0, 0, -1, 0},                    // speaker off, end
-};
-
 enum class AudioCommandType { TickHigh, TickLow, PlaySequence };
 
 struct AudioCommand {
@@ -234,7 +211,7 @@ static void play_sequence(const int (*sequence)[4], size_t len) {
   }
 }
 
-void setup_speaker(bool playSound, bool _led_tick, bool _speaker_tick) {
+void setup_speaker(bool _led_tick, bool _speaker_tick) {
   pinMode(LED_BUILTIN, OUTPUT);
 
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, PIN_SPEAKER_OUTPUT_P);
@@ -249,17 +226,12 @@ void setup_speaker(bool playSound, bool _led_tick, bool _speaker_tick) {
   pwm_config.counter_mode = MCPWM_UP_COUNTER;
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
 
-  tick_enable(false);  // no ticking while we play melody / init sound
+  tick_enable(false);  // no ticking while we init audio
 
   if (!audio_command_queue) {
     audio_command_queue = xQueueCreate(8, sizeof(AudioCommand));
     xTaskCreate(audioTask, "audioTask", 4096, NULL, 1, NULL);
   }
-
-  play_sequence(init_sequence, sizeof(init_sequence) / sizeof(init_sequence[0]));
-
-  if (playSound)
-    play_sequence(melody_sequence, sizeof(melody_sequence) / sizeof(melody_sequence[0]));
 
   led_tick_wanted = _led_tick;
   speaker_tick_wanted = _speaker_tick;

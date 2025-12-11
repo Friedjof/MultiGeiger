@@ -150,14 +150,11 @@ class ConfigManager {
         this.setFieldValue('wifiPassword', config.wifiPassword);
 
         // Misc settings
-        this.setCheckbox('startSound', config.startSound);
         this.setCheckbox('speakerTick', config.speakerTick);
         this.setCheckbox('ledTick', config.ledTick);
         this.setCheckbox('showDisplay', config.showDisplay);
 
         // Transmission settings
-        this.setCheckbox('sendToCommunity', config.sendToCommunity);
-        this.setCheckbox('sendToMadavi', config.sendToMadavi);
         this.setCheckbox('sendToBle', config.sendToBle);
 
         // MQTT settings
@@ -210,14 +207,11 @@ class ConfigManager {
             wifiPassword: document.getElementById('wifiPassword').value,
 
             // Misc settings
-            startSound: document.getElementById('startSound').checked,
             speakerTick: document.getElementById('speakerTick').checked,
             ledTick: document.getElementById('ledTick').checked,
             showDisplay: document.getElementById('showDisplay').checked,
 
             // Transmission settings
-            sendToCommunity: document.getElementById('sendToCommunity').checked,
-            sendToMadavi: document.getElementById('sendToMadavi').checked,
             sendToBle: document.getElementById('sendToBle').checked,
 
             // MQTT settings

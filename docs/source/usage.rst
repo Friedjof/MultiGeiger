@@ -39,20 +39,12 @@ Positions:
   - ``w``: WiFi client trying to connect
   - ``W``: WiFi client connected
   - ``0``: some error happened
-- 1: sensor.community transmission
+- 1: unused (formerly sensor.community)
 
   - ``.``: off (not configured, not enabled)
-  - ``?``: init (enabled, before 1st transmission)
-  - ``S``: sending
-  - ``s``: idle (shown after successful sending)
-  - ``1``: sending failed (shown after trying to send)
-- 2: madavi transmission
+- 2: unused (formerly madavi)
 
   - ``.``: off (not configured, not enabled)
-  - ``?``: init (enabled, before 1st transmission)
-  - ``M``: sending
-  - ``m``: idle (shown after successful sending)
-  - ``2``: sending failed (shown after trying to send)
 - 3: TTN ("The Things Network")
 
   - ``.``: off (not configured, not enabled, no LoRa hardware)
