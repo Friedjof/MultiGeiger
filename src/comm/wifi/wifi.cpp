@@ -831,14 +831,46 @@ void handleApiStatus(void) {
   unsigned long mqttLastPublish = controller.getMqtt().getLastPublishTime();
   json += ",\"mqtt_enabled\":" + String(configService.getConfig().sendToMqtt ? "true" : "false");
   json += ",\"mqtt_connected\":" + String((mqttLastPublish > 0) ? "true" : "false");
+
   if (mqttLastPublish > 0) {
-    json += ",\"mqtt_last_publish\":" + String(mqttLastPublish);
+    // Convert millis() to Unix epoch milliseconds
+    time_t now = time(nullptr);
+    unsigned long currentMillis = millis();
+
+    // Handle millis() overflow (occurs after ~49 days)
+    unsigned long millisAgo;
+    if (currentMillis >= mqttLastPublish) {
+      millisAgo = currentMillis - mqttLastPublish;
+    } else {
+      // Overflow occurred
+      millisAgo = (0xFFFFFFFFUL - mqttLastPublish) + currentMillis + 1;
+    }
+
+    // Convert to Unix epoch in milliseconds
+    unsigned long long epochMs = ((unsigned long long)now * 1000ULL) - millisAgo;
+    json += ",\"mqtt_last_publish\":" + String(epochMs);
   }
 
   // LoRa status
   if (lastLoRaSendTime > 0) {
+    // Convert millis() to Unix epoch milliseconds
+    time_t now = time(nullptr);
+    unsigned long currentMillis = millis();
+
+    // Handle millis() overflow (occurs after ~49 days)
+    unsigned long millisAgo;
+    if (currentMillis >= lastLoRaSendTime) {
+      millisAgo = currentMillis - lastLoRaSendTime;
+    } else {
+      // Overflow occurred
+      millisAgo = (0xFFFFFFFFUL - lastLoRaSendTime) + currentMillis + 1;
+    }
+
+    // Convert to Unix epoch in milliseconds
+    unsigned long long epochMs = ((unsigned long long)now * 1000ULL) - millisAgo;
+
     json += ",\"lora_enabled\":true";
-    json += ",\"lora_last_send\":" + String(lastLoRaSendTime);
+    json += ",\"lora_last_send\":" + String(epochMs);
   } else {
     json += ",\"lora_enabled\":" + String(configService.getConfig().sendToLora ? "true" : "false");
   }
