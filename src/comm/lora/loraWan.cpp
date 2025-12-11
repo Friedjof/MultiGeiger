@@ -203,12 +203,15 @@ void setup_lorawan() {
   uint8_t nwkSKey[16];
   uint8_t appSKey[16];
 
+  // Get config
+  Config& cfg = configService.getConfig();
+
   // Convert DevAddr from hex string (e.g., "26011D01") to uint32_t
-  devAddr = strtoul(devaddr, NULL, 16);
+  devAddr = strtoul(cfg.devaddr, NULL, 16);
 
   // Convert NwkSKey and AppSKey from hex strings to byte arrays
-  hex2data(nwkSKey, (const char *) nwkskey, 16);
-  hex2data(appSKey, (const char *) appskey, 16);
+  hex2data(nwkSKey, (const char *) cfg.nwkskey, 16);
+  hex2data(appSKey, (const char *) cfg.appskey, 16);
 
   log(INFO, "LoRa: Setting ABP session (DevAddr: 0x%08X)", devAddr);
 

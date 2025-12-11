@@ -7,11 +7,7 @@
 
 #include "drivers/hal/heltecv2.hpp"
 #include "core/core.hpp"
-
-// ABP credentials
-extern char devaddr[];
-extern char nwkskey[];
-extern char appskey[];
+#include "config/ConfigService.hpp"
 
 typedef enum {
   TX_STATUS_UNKNOWN = 0,

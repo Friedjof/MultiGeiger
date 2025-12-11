@@ -8,45 +8,19 @@
 #include <HTTPClient.h>
 #include <DNSServer.h>
 #include <WebServer.h>
-#include <IotWebConf.h>
-#include <IotWebConfTParameter.h>
-#include <IotWebConfESP32HTTPUpdateServer.h>
+#include <Update.h>
+#include <ArduinoOTA.h>
 
 #include "core/core.hpp"
 #include "drivers/display/display.hpp"
 #include "drivers/io/io.hpp"
 #include "comm/lora/loraWan.hpp"
 #include "config/config.hpp"
-
-extern bool speakerTick;
-extern bool playSound;
-extern bool ledTick;
-extern bool showDisplay;
-extern bool sendToCommunity;
-extern bool sendToMadavi;
-extern bool sendToLora;
-extern bool sendToBle;
-extern bool soundLocalAlarm;
-extern bool sendToMqtt;
-extern bool mqttUseTls;
-extern bool mqttRetain;
-extern uint16_t mqttPort;
-extern int mqttQos;
-extern char mqttHost[];
-extern char mqttUsername[];
-extern char mqttPassword[];
-extern char mqttBaseTopic[];
-
-// ABP LoRaWAN credentials
-extern char devaddr[];
-extern char nwkskey[];
-extern char appskey[];
-
-extern float localAlarmThreshold;
-extern int localAlarmFactor;
+#include "config/ConfigService.hpp"
+#include "comm/wifi/WiFiService.hpp"
 
 extern char ssid[];
-extern IotWebConf iotWebConf;
+extern WiFiService wifiService;
 
 void setup_webconf(bool loraHardware);
 
@@ -72,7 +46,8 @@ public:
   void beginWeb(bool loraHardware) { setup_webconf(loraHardware); }
   void beginTx(const char *version, char *chipSsid, bool loraHardware) { setup_transmission(version, chipSsid, loraHardware); }
   void pollTx() { poll_transmission(); }
-  void pollWeb() { iotWebConf.doLoop(); }
+  void pollWeb();  // Declaration - implemented in wifi.cpp
+  WiFiState getState() { return wifiService.getState(); }
   void send(const String &tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
             int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status) {
     transmit_data(tube_type, tube_nbr, dt, hv_pulses, gm_counts, cpm, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type, wifi_status);

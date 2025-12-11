@@ -16,6 +16,8 @@ static const unsigned long MINCOUNTS = 100;
 static const unsigned long LOOP_DURATION = 1000;
 
 void MultiGeigerController::begin() {
+  Config& cfg = configService.getConfig();
+
   isLoraBoard = io.detectLoRa();
   setup_log(DEFAULT_LOG_LEVEL);
   display.begin(isLoraBoard);
@@ -23,21 +25,22 @@ void MultiGeigerController::begin() {
   switches_state = io.readSwitches();  // only read DIP switches once at boot time
   sensors.beginThp();
   wifi.beginWeb(isLoraBoard);
-  io.setupSpeaker(playSound, ledTick && switches_state.led_on, speakerTick && switches_state.speaker_on);
+  io.setupSpeaker(cfg.playSound, cfg.ledTick && switches_state.led_on, cfg.speakerTick && switches_state.speaker_on);
   wifi.beginTx(VERSION_STR, ssid, isLoraBoard);
+  extern int mqttQos;  // From wifi.cpp
   MqttConfig mqttCfg{
-    .enabled = sendToMqtt,
-    .host = String(mqttHost),
-    .port = mqttPort,
-    .useTls = mqttUseTls,
-    .username = String(mqttUsername),
-    .password = String(mqttPassword),
-    .retain = mqttRetain,
+    .enabled = cfg.sendToMqtt,
+    .host = String(cfg.mqttHost),
+    .port = cfg.mqttPort,
+    .useTls = cfg.mqttUseTls,
+    .username = String(cfg.mqttUsername),
+    .password = String(cfg.mqttPassword),
+    .retain = cfg.mqttRetain,
     .qos = mqttQos,
-    .baseTopic = String(mqttBaseTopic)
+    .baseTopic = String(cfg.mqttBaseTopic)
   };
   mqtt.begin(mqttCfg, ssid);
-  ble.begin(ssid, sendToBle && switches_state.ble_on);
+  ble.begin(ssid, cfg.sendToBle && switches_state.ble_on);
   setup_log_data(SERIAL_DEBUG);
   sensors.beginTube();
   log(DEBUG, "All Setup done");
@@ -57,14 +60,14 @@ void MultiGeigerController::setupNtp(int wifi_status) {
 
 int MultiGeigerController::updateWifiStatus() {
   int st;
-  switch (iotWebConf.getState()) {
-  case iotwebconf::Connecting:
+  switch (wifi.getState()) {
+  case WIFI_STATE_CONNECTING:
     st = ST_WIFI_CONNECTING;
     break;
-  case iotwebconf::OnLine:
+  case WIFI_STATE_ONLINE:
     st = ST_WIFI_CONNECTED;
     break;
-  case iotwebconf::ApMode:
+  case WIFI_STATE_AP_MODE:
     st = ST_WIFI_AP;
     break;
   default:
@@ -76,8 +79,9 @@ int MultiGeigerController::updateWifiStatus() {
 }
 
 int MultiGeigerController::updateBleStatus() {  // currently no error detection
+  Config& cfg = configService.getConfig();
   int st;
-  if (sendToBle && switches_state.ble_on)
+  if (cfg.sendToBle && switches_state.ble_on)
     st = ble.connected() ? ST_BLE_CONNECTED : ST_BLE_CONNECTABLE;
   else
     st = ST_BLE_OFF;
@@ -118,19 +122,21 @@ void MultiGeigerController::publish(unsigned long current_ms, unsigned long curr
     accumulated_Count_Rate = (accumulated_time != 0) ? (float)accumulated_GMC_counts * 1000.0 / (float)accumulated_time : 0.0;
     accumulated_Dose_Rate = accumulated_Count_Rate * GMC_factor_uSvph;
 
+    Config& cfg = configService.getConfig();
+
     ble.update((unsigned int)(Count_Rate * 60));
     display.showGmc((unsigned int)(accumulated_time / 1000), (int)(accumulated_Dose_Rate * 1000), (int)(Count_Rate * 60),
-                    (showDisplay && switches_state.display_on));
+                    (cfg.showDisplay && switches_state.display_on));
     mqtt.publishLive(Count_Rate, Dose_Rate, counts, dt, hv_pulses_delta,
                      accumulated_GMC_counts, accumulated_time, accumulated_Count_Rate, accumulated_Dose_Rate,
                      temperature, humidity, pressure);
 
-    if (soundLocalAlarm && GMC_factor_uSvph > 0) {
-      if (accumulated_Dose_Rate > localAlarmThreshold) {
-        log(WARNING, "Local alarm: Accumulated dose of %.3f µSv/h above threshold at %.3f µSv/h", accumulated_Dose_Rate, localAlarmThreshold);
+    if (cfg.soundLocalAlarm && GMC_factor_uSvph > 0) {
+      if (accumulated_Dose_Rate > cfg.localAlarmThreshold) {
+        log(WARNING, "Local alarm: Accumulated dose of %.3f µSv/h above threshold at %.3f µSv/h", accumulated_Dose_Rate, cfg.localAlarmThreshold);
         io.triggerAlarm();
-      } else if (Dose_Rate > (accumulated_Dose_Rate * localAlarmFactor)) {
-        log(WARNING, "Local alarm: Current dose of %.3f > %d x accumulated dose of %.3f µSv/h", Dose_Rate, localAlarmFactor, accumulated_Dose_Rate);
+      } else if (Dose_Rate > (accumulated_Dose_Rate * cfg.localAlarmFactor)) {
+        log(WARNING, "Local alarm: Current dose of %.3f > %d x accumulated dose of %.3f µSv/h", Dose_Rate, cfg.localAlarmFactor, accumulated_Dose_Rate);
         io.triggerAlarm();
       }
     }
@@ -146,7 +152,8 @@ void MultiGeigerController::publish(unsigned long current_ms, unsigned long curr
     if (afterStartTime && ((current_ms - boot_timestamp) >= afterStartTime)) {
       afterStartTime = 0;
       ble.update(0);
-      display.showGmc(0, 0, 0, (showDisplay && switches_state.display_on));
+      Config& cfg = configService.getConfig();
+      display.showGmc(0, 0, 0, (cfg.showDisplay && switches_state.display_on));
     }
   }
 }
@@ -243,7 +250,7 @@ void MultiGeigerController::loopOnce() {
   transmit(current_ms, gm_counts, gm_count_timestamp, hv_pulses, have_thp, temperature, humidity, pressure, gas_resistance, sensor_type, wifi_status);
 
   long loop_duration = millis() - current_ms;
-  iotWebConf.delay((loop_duration < LOOP_DURATION) ? (LOOP_DURATION - loop_duration) : 0);
+  delay((loop_duration < LOOP_DURATION) ? (LOOP_DURATION - loop_duration) : 0);
 }
 
 void MultiGeigerController::applyTickSettings(bool ledTick, bool speakerTick) {

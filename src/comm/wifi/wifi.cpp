@@ -15,7 +15,9 @@ extern MultiGeigerController controller;
 #define MQTT_BASE_TOPIC ""
 #endif
 
-extern IotWebConf iotWebConf;
+// Global instances
+WiFiService wifiService;
+WebServer server(80);
 
 // CA Roots for LetsEncrypt Certificates (cross-signed):
 // - 1. ISRG Root X1 - valid until 2035-06-04
@@ -180,12 +182,34 @@ void setup_transmission(const char *version, char *ssid, bool loraHardware) {
   c_customsrv.wc->setCACert(ca_certs);
   c_customsrv.hc = new HTTPClient;
 
-  set_status(STATUS_SCOMM, sendToCommunity ? ST_SCOMM_INIT : ST_SCOMM_OFF);
-  set_status(STATUS_MADAVI, sendToMadavi ? ST_MADAVI_INIT : ST_MADAVI_OFF);
-  set_status(STATUS_TTN, sendToLora ? ST_TTN_INIT : ST_TTN_OFF);
+  Config& cfg = configService.getConfig();
+  set_status(STATUS_SCOMM, cfg.sendToCommunity ? ST_SCOMM_INIT : ST_SCOMM_OFF);
+  set_status(STATUS_MADAVI, cfg.sendToMadavi ? ST_MADAVI_INIT : ST_MADAVI_OFF);
+  set_status(STATUS_TTN, cfg.sendToLora ? ST_TTN_INIT : ST_TTN_OFF);
+}
+
+void WifiManager::pollWeb() {
+  // Process WiFi state machine and DNS requests
+  wifiService.loop();
+
+  // Handle web server requests
+  server.handleClient();
 }
 
 void poll_transmission() {
+  // Start ArduinoOTA once WiFi is connected (only once)
+  static bool arduinoOtaStarted = false;
+  if (!arduinoOtaStarted && WiFi.status() == WL_CONNECTED) {
+    ArduinoOTA.begin();
+    log(INFO, "ArduinoOTA: Ready for IDE uploads (hostname: %s)", WiFi.getHostname());
+    arduinoOtaStarted = true;
+  }
+
+  // Handle ArduinoOTA requests (only if started)
+  if (arduinoOtaStarted) {
+    ArduinoOTA.handle();
+  }
+
   // Check for scheduled restart
   if (restartScheduled && millis() >= restartTime) {
     log(INFO, "Executing scheduled restart...");
@@ -410,6 +434,7 @@ int send_ttn_thp(float temperature, float humidity, float pressure) {
 void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int hv_pulses, unsigned int gm_counts, unsigned int cpm,
                    int have_thp, float temperature, float humidity, float pressure, float gas_resistance, int sensor_type, int wifi_status) {
   int rc1, rc2;
+  Config& cfg = configService.getConfig();
 
   #if SEND2CUSTOMSRV
   bool customsrv_ok;
@@ -420,7 +445,7 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
   log(INFO, "Sent to CUSTOMSRV, status: %s, http: %d %d", customsrv_ok ? "ok" : "error", rc1, rc2);
   #endif
 
-  if(sendToMadavi && (wifi_status == ST_WIFI_CONNECTED)) {
+  if(cfg.sendToMadavi && (wifi_status == ST_WIFI_CONNECTED)) {
     bool madavi_ok;
     log(INFO, "Sending to Madavi ...");
     set_status(STATUS_MADAVI, ST_MADAVI_SENDING);
@@ -434,7 +459,7 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     display_status();
   }
 
-  if(sendToCommunity  && (wifi_status == ST_WIFI_CONNECTED)) {
+  if(cfg.sendToCommunity && (wifi_status == ST_WIFI_CONNECTED)) {
     bool scomm_ok;
     log(INFO, "Sending to sensor.community ...");
     set_status(STATUS_SCOMM, ST_SCOMM_SENDING);
@@ -448,10 +473,10 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     display_status();
   }
 
-  if(isLoraBoard && sendToLora && (strcmp(devaddr, "") != 0)) {    // send only, if we have ABP credentials
+  if(isLoraBoard && cfg.sendToLora && (strcmp(cfg.devaddr, "") != 0)) {    // send only, if we have ABP credentials
     bool ttn_ok;
     log(INFO, "Sending to TTN ...");
-    log(INFO, "  - isLoraBoard: %d, sendToLora: %d, devaddr: %s", isLoraBoard, sendToLora, devaddr);
+    log(INFO, "  - isLoraBoard: %d, sendToLora: %d, devaddr: %s", isLoraBoard, cfg.sendToLora, cfg.devaddr);
     set_status(STATUS_TTN, ST_TTN_SENDING);
     display_status();
     // Send combined message with GM + THP + Gas data in one transmission
@@ -465,9 +490,9 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
     // Log why LoRa is not sending
     if (!isLoraBoard) {
       log(INFO, "NOT sending to TTN: LoRa hardware not detected");
-    } else if (!sendToLora) {
+    } else if (!cfg.sendToLora) {
       log(INFO, "NOT sending to TTN: 'Send to LoRa' disabled in config");
-    } else if (strcmp(devaddr, "") == 0) {
+    } else if (strcmp(cfg.devaddr, "") == 0) {
       log(INFO, "NOT sending to TTN: DevAddr is empty (ABP not configured)");
     }
   }
@@ -476,126 +501,12 @@ void transmit_data(String tube_type, int tube_nbr, unsigned int dt, unsigned int
 // Web Configuration related code
 // also: OTA updates
 
-// Checkboxes have 'selected' if checked, so we need 9 byte for this string.
-#define CHECKBOX_LEN 9
-
-bool speakerTick = SPEAKER_TICK;
-bool playSound = PLAY_SOUND;
-bool ledTick = LED_TICK;
-bool showDisplay = SHOW_DISPLAY;
-bool sendToCommunity = SEND2SENSORCOMMUNITY;
-bool sendToMadavi = SEND2MADAVI;
-bool sendToLora = SEND2LORA;
-bool sendToBle = SEND2BLE;
-bool soundLocalAlarm = LOCAL_ALARM_SOUND;
-bool sendToMqtt = SEND2MQTT;
-
-#define MQTT_HOST_LEN 64
-#define MQTT_USER_LEN IOTWEBCONF_WORD_LEN
-#define MQTT_PASS_LEN IOTWEBCONF_WORD_LEN
-#define MQTT_BASE_TOPIC_LEN 64
-
-char mqttHost[MQTT_HOST_LEN] = MQTT_BROKER;
-uint16_t mqttPort = MQTT_PORT;
-bool mqttUseTls = MQTT_USE_TLS;
-bool mqttRetain = MQTT_RETAIN;
+// QoS for MQTT (not configurable via UI currently)
 int mqttQos = MQTT_QOS;
-char mqttUsername[MQTT_USER_LEN] = MQTT_USERNAME;
-char mqttPassword[MQTT_PASS_LEN] = MQTT_PASSWORD;
-char mqttBaseTopic[MQTT_BASE_TOPIC_LEN] = MQTT_BASE_TOPIC;
 
-char speakerTick_c[CHECKBOX_LEN];
-char playSound_c[CHECKBOX_LEN];
-char ledTick_c[CHECKBOX_LEN];
-char showDisplay_c[CHECKBOX_LEN];
-char sendToCommunity_c[CHECKBOX_LEN];
-char sendToMadavi_c[CHECKBOX_LEN];
-char sendToLora_c[CHECKBOX_LEN];
-char sendToBle_c[CHECKBOX_LEN];
-char soundLocalAlarm_c[CHECKBOX_LEN];
-char sendToMqtt_c[CHECKBOX_LEN];
-char mqttUseTls_c[CHECKBOX_LEN];
-char mqttRetain_c[CHECKBOX_LEN];
-
-// ABP LoRaWAN credentials (instead of OTAA)
-char devaddr[IOTWEBCONF_WORD_LEN] = "";  // Device Address (8 hex chars, e.g., "26011D01")
-char nwkskey[IOTWEBCONF_WORD_LEN] = "";  // Network Session Key (32 hex chars)
-char appskey[IOTWEBCONF_WORD_LEN] = "";  // Application Session Key (32 hex chars)
-
-float localAlarmThreshold = LOCAL_ALARM_THRESHOLD;
-int localAlarmFactor = (int)LOCAL_ALARM_FACTOR;
-
-// HTTP Basic Auth credentials for /config and /api/config
-#define HTTP_AUTH_USER_LEN IOTWEBCONF_WORD_LEN
-#define HTTP_AUTH_PASS_LEN IOTWEBCONF_WORD_LEN
-char httpAuthUser[HTTP_AUTH_USER_LEN] = HTTP_AUTH_USER;
-char httpAuthPass[HTTP_AUTH_PASS_LEN] = HTTP_AUTH_PASS;
-
-iotwebconf::ParameterGroup grpMisc = iotwebconf::ParameterGroup("misc", "Misc. Settings");
-iotwebconf::CheckboxParameter startSoundParam = iotwebconf::CheckboxParameter("Start sound", "startSound", playSound_c, CHECKBOX_LEN, playSound);
-iotwebconf::CheckboxParameter speakerTickParam = iotwebconf::CheckboxParameter("Speaker tick", "speakerTick", speakerTick_c, CHECKBOX_LEN, speakerTick);
-iotwebconf::CheckboxParameter ledTickParam = iotwebconf::CheckboxParameter("LED tick", "ledTick", ledTick_c, CHECKBOX_LEN, ledTick);
-iotwebconf::CheckboxParameter showDisplayParam = iotwebconf::CheckboxParameter("Show display", "showDisplay", showDisplay_c, CHECKBOX_LEN, showDisplay);
-
-iotwebconf::ParameterGroup grpTransmission = iotwebconf::ParameterGroup("transmission", "Transmission Settings");
-iotwebconf::CheckboxParameter sendToCommunityParam = iotwebconf::CheckboxParameter("Send to sensor.community", "send2Community", sendToCommunity_c, CHECKBOX_LEN, sendToCommunity);
-iotwebconf::CheckboxParameter sendToMadaviParam = iotwebconf::CheckboxParameter("Send to madavi.de", "send2Madavi", sendToMadavi_c, CHECKBOX_LEN, sendToMadavi);
-iotwebconf::CheckboxParameter sendToBleParam = iotwebconf::CheckboxParameter("Send to BLE (Reboot required!)", "send2ble", sendToBle_c, CHECKBOX_LEN, sendToBle);
-
-iotwebconf::ParameterGroup grpLoRa = iotwebconf::ParameterGroup("lora", "LoRa Settings");
-iotwebconf::CheckboxParameter sendToLoraParam = iotwebconf::CheckboxParameter("Send to LoRa (=>TTN)", "send2lora", sendToLora_c, CHECKBOX_LEN, sendToLora);
-iotwebconf::TextParameter devaddrParam = iotwebconf::TextParameter("DevAddr (ABP)", "devaddr", devaddr, IOTWEBCONF_WORD_LEN);
-iotwebconf::TextParameter nwkskeyParam = iotwebconf::TextParameter("NwkSKey (ABP)", "nwkskey", nwkskey, IOTWEBCONF_WORD_LEN);
-iotwebconf::TextParameter appskeyParam = iotwebconf::TextParameter("AppSKey (ABP)", "appskey", appskey, IOTWEBCONF_WORD_LEN);
-
-iotwebconf::ParameterGroup grpMqtt = iotwebconf::ParameterGroup("mqtt", "MQTT Settings");
-iotwebconf::CheckboxParameter sendToMqttParam = iotwebconf::CheckboxParameter("Send to MQTT", "send2mqtt", sendToMqtt_c, CHECKBOX_LEN, sendToMqtt);
-iotwebconf::TextParameter mqttHostParam = iotwebconf::TextParameter("MQTT host", "mqttHost", mqttHost, MQTT_HOST_LEN);
-auto mqttPortParam =
-  iotwebconf::Builder<iotwebconf::IntTParameter<uint16_t>>("mqttPort")
-  .label("MQTT port")
-  .defaultValue(mqttPort)
-  .min(1).max(65535)
-  .placeholder("1883")
-  .build();
-iotwebconf::CheckboxParameter mqttUseTlsParam = iotwebconf::CheckboxParameter("Use TLS (insecure PoC)", "mqttTls", mqttUseTls_c, CHECKBOX_LEN, mqttUseTls);
-iotwebconf::CheckboxParameter mqttRetainParam = iotwebconf::CheckboxParameter("Retain MQTT messages", "mqttRetain", mqttRetain_c, CHECKBOX_LEN, mqttRetain);
-iotwebconf::TextParameter mqttUserParam = iotwebconf::TextParameter("MQTT username", "mqttUser", mqttUsername, MQTT_USER_LEN);
-iotwebconf::TextParameter mqttPassParam = iotwebconf::TextParameter("MQTT password", "mqttPass", mqttPassword, MQTT_PASS_LEN);
-iotwebconf::TextParameter mqttBaseTopicParam = iotwebconf::TextParameter("Base topic (optional)", "mqttBase", mqttBaseTopic, MQTT_BASE_TOPIC_LEN);
-
-iotwebconf::ParameterGroup grpAlarm = iotwebconf::ParameterGroup("alarm", "Local Alarm Setting");
-iotwebconf::CheckboxParameter soundLocalAlarmParam = iotwebconf::CheckboxParameter("Enable local alarm sound", "soundLocalAlarm", soundLocalAlarm_c, CHECKBOX_LEN, soundLocalAlarm);
-iotwebconf::FloatTParameter localAlarmThresholdParam =
-  iotwebconf::Builder<iotwebconf::FloatTParameter>("localAlarmThreshold").
-  label("Local alarm threshold (µSv/h)").
-  defaultValue(localAlarmThreshold).
-  step(0.1).placeholder("e.g. 0.5").build();
-iotwebconf::IntTParameter<int16_t> localAlarmFactorParam =
-  iotwebconf::Builder<iotwebconf::IntTParameter<int16_t>>("localAlarmFactor").
-  label("Factor of current dose rate vs. accumulated").
-  defaultValue(localAlarmFactor).
-  min(2).max(100).
-  step(1).placeholder("2..100").build();
-
-iotwebconf::ParameterGroup grpAuth = iotwebconf::ParameterGroup("auth", "HTTP Authentication");
-iotwebconf::TextParameter httpAuthUserParam = iotwebconf::TextParameter("Config username", "httpAuthUser", httpAuthUser, HTTP_AUTH_USER_LEN);
-iotwebconf::PasswordParameter httpAuthPassParam = iotwebconf::PasswordParameter("Config password", "httpAuthPass", httpAuthPass, HTTP_AUTH_PASS_LEN);
-
-DNSServer dnsServer;
-WebServer server(80);
-HTTPUpdateServer httpUpdater;
+char ssid[33];  // Device name / AP SSID
 
 char *buildSSID(void);
-
-// SSID == thingName
-const char *theName = buildSSID();
-char ssid[IOTWEBCONF_WORD_LEN];  // LEN == 33 (2020-01-13)
-
-// -- Initial password to connect to the Thing, when it creates an own Access Point.
-const char wifiInitialApPassword[] = "ESP32Geiger";
-
-IotWebConf iotWebConf(theName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
 unsigned long getESPchipID() {
   uint64_t espid = ESP.getEfuseMac();
@@ -623,14 +534,131 @@ char *buildSSID() {
  */
 bool checkHttpAuth(void) {
   // Skip auth when in AP mode - WiFi password is sufficient authentication
-  if (iotWebConf.getState() == iotwebconf::ApMode || iotWebConf.getState() == iotwebconf::Boot) {
+  WiFiState state = wifiService.getState();
+  if (state == WIFI_STATE_AP_MODE || state == WIFI_STATE_BOOT) {
     return true;
   }
 
-  if (!server.authenticate(httpAuthUser, httpAuthPass)) {
+  Config& cfg = configService.getConfig();
+  if (!server.authenticate(cfg.httpAuthUser, cfg.httpAuthPass)) {
     server.requestAuthentication(BASIC_AUTH, "MultiGeiger Config", "Authentication required");
     return false;
   }
+  return true;
+}
+
+// Rate limiting for config POSTs
+static unsigned long lastConfigPostTime = 0;
+static int configPostAttempts = 0;
+#define CONFIG_POST_MIN_INTERVAL_MS 1000  // Min 1 second between POSTs
+#define CONFIG_POST_MAX_ATTEMPTS 10       // Max 10 attempts per minute
+
+/**
+ * @brief Check rate limiting for config POST requests
+ * @return true if allowed, false if rate limit exceeded
+ */
+bool checkRateLimit(void) {
+  unsigned long now = millis();
+
+  // Reset counter every minute
+  if (now - lastConfigPostTime > 60000) {
+    configPostAttempts = 0;
+  }
+
+  // Check if too many attempts
+  if (configPostAttempts >= CONFIG_POST_MAX_ATTEMPTS) {
+    log(WARNING, "Rate limit exceeded for config POST");
+    server.send(429, "application/json", "{\"status\":\"error\",\"message\":\"Too many requests. Try again later.\"}");
+    return false;
+  }
+
+  // Check minimum interval
+  if (now - lastConfigPostTime < CONFIG_POST_MIN_INTERVAL_MS) {
+    log(WARNING, "Config POST too fast");
+    server.send(429, "application/json", "{\"status\":\"error\",\"message\":\"Please wait before sending another request.\"}");
+    return false;
+  }
+
+  lastConfigPostTime = now;
+  configPostAttempts++;
+  return true;
+}
+
+/**
+ * @brief Validate and sanitize string input
+ * @param input String to validate
+ * @param maxLen Maximum allowed length
+ * @return true if valid, false otherwise
+ */
+bool validateString(const String &input, size_t maxLen) {
+  if (input.length() == 0 || input.length() >= maxLen) {
+    return false;
+  }
+
+  // Check for null bytes (potential exploit)
+  for (size_t i = 0; i < input.length(); i++) {
+    if (input[i] == '\0') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief Validate port number
+ * @param port Port number to validate
+ * @return true if valid (1-65535), false otherwise
+ */
+bool validatePort(uint16_t port) {
+  return (port >= 1 && port <= 65535);
+}
+
+/**
+ * @brief Validate float value in range
+ * @param value Value to validate
+ * @param min Minimum allowed value
+ * @param max Maximum allowed value
+ * @return true if valid, false otherwise
+ */
+bool validateFloat(float value, float min, float max) {
+  return (value >= min && value <= max && !isnan(value) && !isinf(value));
+}
+
+/**
+ * @brief Validate integer value in range
+ * @param value Value to validate
+ * @param min Minimum allowed value
+ * @param max Maximum allowed value
+ * @return true if valid, false otherwise
+ */
+bool validateInt(int value, int min, int max) {
+  return (value >= min && value <= max);
+}
+
+/**
+ * @brief Validate hex string (for LoRa keys)
+ * @param input String to validate
+ * @param expectedLen Expected length (0 = any length)
+ * @return true if valid hex string, false otherwise
+ */
+bool validateHexString(const String &input, size_t expectedLen) {
+  if (input.length() == 0 || input.length() >= LORA_KEY_LEN) {
+    return false;
+  }
+
+  if (expectedLen > 0 && input.length() != expectedLen) {
+    return false;
+  }
+
+  // Check if all characters are valid hex
+  for (size_t i = 0; i < input.length(); i++) {
+    char c = input[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -671,12 +699,6 @@ void handleApiStatus(void) {
 }
 
 void handleRoot(void) {  // Handle web requests to "/" path.
-  // -- Let IotWebConf test and handle captive portal requests.
-  if (iotWebConf.handleCaptivePortal()) {
-    // -- Captive portal requests were already served.
-    return;
-  }
-
   // Serve modern dashboard with live data (read-only, no need to disable ticks)
   // User can access dashboard even in AP mode - config is available at /config
   serveCompressed(server, dashboard_html_gz, dashboard_html_gz_len, "text/html");
@@ -711,99 +733,35 @@ void handleConfigPing(void) {
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
-static char lastWiFiSSID[IOTWEBCONF_WORD_LEN] = "";
-static WiFiEventId_t wifiEventId;
-static WiFiEventId_t apConnectEventId;
-static WiFiEventId_t apDisconnectEventId;
-
-static bool hasConfiguredWifi() {
-  const char *cfgSsid = iotWebConf.getWifiSsidParameter()->valueBuffer;
-  return (cfgSsid != nullptr) && (strlen(cfgSsid) > 0);
-}
-
-static void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
-  if (event != ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
-    return;
-
-  int reason = info.wifi_sta_disconnected.reason;
-  log(INFO, "WiFi disconnect event (reason=%d)", reason);
-
-  if (!hasConfiguredWifi()) {
-    log(INFO, "WiFi reconnect skipped: no client SSID configured");
-    return;
-  }
-
-  log(INFO, "WiFi reconnecting to configured network via IotWebConf");
-  // The regular doLoop will push us back to Connecting state.
-}
-
-static void onApClientConnectEvent(arduino_event_id_t event, arduino_event_info_t info) {
-  if (event != ARDUINO_EVENT_WIFI_AP_STACONNECTED)
-    return;
-
-  log(INFO, "AP client connected, keeping AP open indefinitely");
-  // Disable AP timeout when client connects - keep AP open
-  iotWebConf.setApTimeoutMs(0);  // 0 = no timeout, AP stays open
-}
-
-static void onApClientDisconnectEvent(arduino_event_id_t event, arduino_event_info_t info) {
-  if (event != ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)
-    return;
-
-  log(INFO, "AP client disconnected");
-
-  // If WiFi STA is configured, switch to STA mode
-  if (hasConfiguredWifi() && iotWebConf.getState() == iotwebconf::ApMode) {
-    log(INFO, "WiFi STA configured, switching to STA mode");
-    iotWebConf.forceApMode(false);  // will change state to Connecting if allowed
-  }
-}
+static char lastWiFiSSID[33] = "";
 
 void loadConfigVariables(void) {
+  Config& cfg = configService.getConfig();
+
   // check if WiFi SSID has changed. If so, restart cpu. Otherwise, the program will not use the new SSID
-  if ((strcmp(lastWiFiSSID, "") != 0) && (strcmp(lastWiFiSSID, iotWebConf.getWifiSsidParameter()->valueBuffer) != 0)) {
-    log(INFO, "Doing restart...");
+  if ((strcmp(lastWiFiSSID, "") != 0) && (strcmp(lastWiFiSSID, cfg.wifiSsid) != 0)) {
+    log(INFO, "WiFi SSID changed - restarting...");
     ESP.restart();
   }
-  strcpy(lastWiFiSSID, iotWebConf.getWifiSsidParameter()->valueBuffer);
-
-  speakerTick = speakerTickParam.isChecked();
-  playSound = startSoundParam.isChecked();
-  ledTick = ledTickParam.isChecked();
-  showDisplay = showDisplayParam.isChecked();
-  sendToCommunity = sendToCommunityParam.isChecked();
-  sendToMadavi = sendToMadaviParam.isChecked();
-  sendToLora = sendToLoraParam.isChecked();
-  sendToBle = sendToBleParam.isChecked();
-  soundLocalAlarm = soundLocalAlarmParam.isChecked();
-  localAlarmThreshold = localAlarmThresholdParam.value();
-  localAlarmFactor = localAlarmFactorParam.value();
-  sendToMqtt = sendToMqttParam.isChecked();
-  mqttUseTls = mqttUseTlsParam.isChecked();
-  mqttRetain = mqttRetainParam.isChecked();
-  mqttPort = mqttPortParam.value();
-  strncpy(mqttHost, mqttHostParam.valueBuffer, MQTT_HOST_LEN);
-  mqttHost[MQTT_HOST_LEN - 1] = '\0';
-  strncpy(mqttUsername, mqttUserParam.valueBuffer, MQTT_USER_LEN);
-  mqttUsername[MQTT_USER_LEN - 1] = '\0';
-  strncpy(mqttPassword, mqttPassParam.valueBuffer, MQTT_PASS_LEN);
-  mqttPassword[MQTT_PASS_LEN - 1] = '\0';
-  strncpy(mqttBaseTopic, mqttBaseTopicParam.valueBuffer, MQTT_BASE_TOPIC_LEN);
-  mqttBaseTopic[MQTT_BASE_TOPIC_LEN - 1] = '\0';
-  strncpy(httpAuthUser, httpAuthUserParam.valueBuffer, HTTP_AUTH_USER_LEN);
-  httpAuthUser[HTTP_AUTH_USER_LEN - 1] = '\0';
-  strncpy(httpAuthPass, httpAuthPassParam.valueBuffer, HTTP_AUTH_PASS_LEN);
-  httpAuthPass[HTTP_AUTH_PASS_LEN - 1] = '\0';
+  strcpy(lastWiFiSSID, cfg.wifiSsid);
 }
 
 void configSaved(void) {
   log(INFO, "Config saved. ");
+  Config& cfg = configService.getConfig();
+
   loadConfigVariables();
   configPageActive = false;  // Config saved, no longer on config page
   tick_enable(true);
+
   // Apply updated settings immediately (LED, speaker, display)
-  controller.applyTickSettings(ledTick, speakerTick);
-  controller.applyDisplaySetting(showDisplay);
+  controller.applyTickSettings(cfg.ledTick, cfg.speakerTick);
+  controller.applyDisplaySetting(cfg.showDisplay);
+
+  // Update WiFi connection if credentials changed
+  if (cfg.wifiSsid[0] != '\0') {
+    wifiService.connectToWiFi(cfg.wifiSsid, cfg.wifiPassword);
+  }
 }
 
 void handleGetConfig(void) {
@@ -812,48 +770,49 @@ void handleGetConfig(void) {
     return;  // Auth failed, 401 response already sent
   }
 
+  Config& cfg = configService.getConfig();
   String json = "{";
 
   // WiFi settings
-  json += "\"thingName\":\"" + String(iotWebConf.getThingNameParameter()->valueBuffer) + "\",";
+  json += "\"thingName\":\"" + String(cfg.deviceName) + "\",";
   json += "\"apPassword\":\"********\",";  // Don't expose actual password
-  json += "\"wifiSsid\":\"" + String(iotWebConf.getWifiSsidParameter()->valueBuffer) + "\",";
+  json += "\"wifiSsid\":\"" + String(cfg.wifiSsid) + "\",";
   json += "\"wifiPassword\":\"\",";  // Don't expose actual password
 
   // Misc settings
-  json += "\"startSound\":" + String(playSound ? "true" : "false") + ",";
-  json += "\"speakerTick\":" + String(speakerTick ? "true" : "false") + ",";
-  json += "\"ledTick\":" + String(ledTick ? "true" : "false") + ",";
-  json += "\"showDisplay\":" + String(showDisplay ? "true" : "false") + ",";
+  json += "\"startSound\":" + String(cfg.playSound ? "true" : "false") + ",";
+  json += "\"speakerTick\":" + String(cfg.speakerTick ? "true" : "false") + ",";
+  json += "\"ledTick\":" + String(cfg.ledTick ? "true" : "false") + ",";
+  json += "\"showDisplay\":" + String(cfg.showDisplay ? "true" : "false") + ",";
 
   // Transmission settings
-  json += "\"sendToCommunity\":" + String(sendToCommunity ? "true" : "false") + ",";
-  json += "\"sendToMadavi\":" + String(sendToMadavi ? "true" : "false") + ",";
-  json += "\"sendToBle\":" + String(sendToBle ? "true" : "false") + ",";
+  json += "\"sendToCommunity\":" + String(cfg.sendToCommunity ? "true" : "false") + ",";
+  json += "\"sendToMadavi\":" + String(cfg.sendToMadavi ? "true" : "false") + ",";
+  json += "\"sendToBle\":" + String(cfg.sendToBle ? "true" : "false") + ",";
 
   // MQTT settings
-  json += "\"sendToMqtt\":" + String(sendToMqtt ? "true" : "false") + ",";
-  json += "\"mqttHost\":\"" + String(mqttHost) + "\",";
-  json += "\"mqttPort\":" + String(mqttPort) + ",";
-  json += "\"mqttUseTls\":" + String(mqttUseTls ? "true" : "false") + ",";
-  json += "\"mqttRetain\":" + String(mqttRetain ? "true" : "false") + ",";
-  json += "\"mqttUsername\":\"" + String(mqttUsername) + "\",";
+  json += "\"sendToMqtt\":" + String(cfg.sendToMqtt ? "true" : "false") + ",";
+  json += "\"mqttHost\":\"" + String(cfg.mqttHost) + "\",";
+  json += "\"mqttPort\":" + String(cfg.mqttPort) + ",";
+  json += "\"mqttUseTls\":" + String(cfg.mqttUseTls ? "true" : "false") + ",";
+  json += "\"mqttRetain\":" + String(cfg.mqttRetain ? "true" : "false") + ",";
+  json += "\"mqttUsername\":\"" + String(cfg.mqttUsername) + "\",";
   json += "\"mqttPassword\":\"\",";  // Don't expose actual password
-  json += "\"mqttBaseTopic\":\"" + String(mqttBaseTopic) + "\",";
+  json += "\"mqttBaseTopic\":\"" + String(cfg.mqttBaseTopic) + "\",";
 
   // LoRa settings
   json += "\"hasLora\":" + String(isLoraBoard ? "true" : "false") + ",";
   if (isLoraBoard) {
-    json += "\"sendToLora\":" + String(sendToLora ? "true" : "false") + ",";
-    json += "\"devaddr\":\"" + String(devaddr) + "\",";
-    json += "\"nwkskey\":\"" + String(nwkskey) + "\",";
-    json += "\"appskey\":\"" + String(appskey) + "\",";
+    json += "\"sendToLora\":" + String(cfg.sendToLora ? "true" : "false") + ",";
+    json += "\"devaddr\":\"" + String(cfg.devaddr) + "\",";
+    json += "\"nwkskey\":\"" + String(cfg.nwkskey) + "\",";
+    json += "\"appskey\":\"" + String(cfg.appskey) + "\",";
   }
 
   // Alarm settings
-  json += "\"soundLocalAlarm\":" + String(soundLocalAlarm ? "true" : "false") + ",";
-  json += "\"localAlarmThreshold\":" + String(localAlarmThreshold, 1) + ",";
-  json += "\"localAlarmFactor\":" + String(localAlarmFactor);
+  json += "\"soundLocalAlarm\":" + String(cfg.soundLocalAlarm ? "true" : "false") + ",";
+  json += "\"localAlarmThreshold\":" + String(cfg.localAlarmThreshold, 1) + ",";
+  json += "\"localAlarmFactor\":" + String(cfg.localAlarmFactor);
 
   json += "}";
 
@@ -866,28 +825,44 @@ void handlePostConfig(void) {
     return;  // Auth failed, 401 response already sent
   }
 
+  // Check rate limiting
+  if (!checkRateLimit()) {
+    return;  // Rate limit exceeded, 429 response already sent
+  }
+
   if (!server.hasArg("plain")) {
-    server.send(400, "text/plain", "Body not received");
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Request body missing\"}");
     return;
   }
 
   String body = server.arg("plain");
-  log(INFO, "Received config update");
+
+  // Validate body size (protect against DoS)
+  if (body.length() > 4096) {  // Max 4KB
+    log(WARNING, "Config POST body too large: %d bytes", body.length());
+    server.send(413, "application/json", "{\"status\":\"error\",\"message\":\"Request body too large\"}");
+    return;
+  }
+
+  log(INFO, "Received config update (%d bytes)", body.length());
+
+  Config& cfg = configService.getConfig();
 
   // Parse JSON manually (simple approach - ESP32 can use ArduinoJson if needed)
-  // For now, we'll use a simpler approach - just update the IotWebConf parameters
-  // and call configSaved()
+  int idx;
 
   // WiFi settings (only update if provided and not empty)
-  int idx;
   idx = body.indexOf("\"thingName\":\"");
   if (idx >= 0) {
     int start = idx + 13;
     int end = body.indexOf("\"", start);
     if (end > start) {
       String val = body.substring(start, end);
-      if (val.length() > 0) {
-        strncpy(iotWebConf.getThingNameParameter()->valueBuffer, val.c_str(), IOTWEBCONF_WORD_LEN);
+      if (val.length() > 0 && validateString(val, DEVICE_NAME_LEN)) {
+        strncpy(cfg.deviceName, val.c_str(), DEVICE_NAME_LEN);
+        cfg.deviceName[DEVICE_NAME_LEN - 1] = '\0';
+      } else if (val.length() >= DEVICE_NAME_LEN) {
+        log(WARNING, "thingName too long, ignoring");
       }
     }
   }
@@ -898,7 +873,12 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start) {
       String val = body.substring(start, end);
-      strncpy(iotWebConf.getWifiSsidParameter()->valueBuffer, val.c_str(), IOTWEBCONF_WORD_LEN);
+      if (validateString(val, WIFI_SSID_LEN)) {
+        strncpy(cfg.wifiSsid, val.c_str(), WIFI_SSID_LEN);
+        cfg.wifiSsid[WIFI_SSID_LEN - 1] = '\0';
+      } else if (val.length() >= WIFI_SSID_LEN) {
+        log(WARNING, "wifiSsid too long, ignoring");
+      }
     }
   }
 
@@ -908,27 +888,30 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start && end > start + 1) {  // Only update if password is provided
       String val = body.substring(start, end);
-      if (val.length() > 0) {
-        strncpy(iotWebConf.getWifiPasswordParameter()->valueBuffer, val.c_str(), IOTWEBCONF_PASSWORD_LEN);
+      if (val.length() > 0 && validateString(val, WIFI_PASS_LEN)) {
+        strncpy(cfg.wifiPassword, val.c_str(), WIFI_PASS_LEN);
+        cfg.wifiPassword[WIFI_PASS_LEN - 1] = '\0';
+      } else if (val.length() >= WIFI_PASS_LEN) {
+        log(WARNING, "wifiPassword too long, ignoring");
       }
     }
   }
 
   // Boolean settings - simple parse
-  playSound = body.indexOf("\"startSound\":true") >= 0;
-  speakerTick = body.indexOf("\"speakerTick\":true") >= 0;
-  ledTick = body.indexOf("\"ledTick\":true") >= 0;
-  showDisplay = body.indexOf("\"showDisplay\":true") >= 0;
-  sendToCommunity = body.indexOf("\"sendToCommunity\":true") >= 0;
-  sendToMadavi = body.indexOf("\"sendToMadavi\":true") >= 0;
-  sendToBle = body.indexOf("\"sendToBle\":true") >= 0;
-  sendToMqtt = body.indexOf("\"sendToMqtt\":true") >= 0;
-  mqttUseTls = body.indexOf("\"mqttUseTls\":true") >= 0;
-  mqttRetain = body.indexOf("\"mqttRetain\":true") >= 0;
-  soundLocalAlarm = body.indexOf("\"soundLocalAlarm\":true") >= 0;
+  cfg.playSound = body.indexOf("\"startSound\":true") >= 0;
+  cfg.speakerTick = body.indexOf("\"speakerTick\":true") >= 0;
+  cfg.ledTick = body.indexOf("\"ledTick\":true") >= 0;
+  cfg.showDisplay = body.indexOf("\"showDisplay\":true") >= 0;
+  cfg.sendToCommunity = body.indexOf("\"sendToCommunity\":true") >= 0;
+  cfg.sendToMadavi = body.indexOf("\"sendToMadavi\":true") >= 0;
+  cfg.sendToBle = body.indexOf("\"sendToBle\":true") >= 0;
+  cfg.sendToMqtt = body.indexOf("\"sendToMqtt\":true") >= 0;
+  cfg.mqttUseTls = body.indexOf("\"mqttUseTls\":true") >= 0;
+  cfg.mqttRetain = body.indexOf("\"mqttRetain\":true") >= 0;
+  cfg.soundLocalAlarm = body.indexOf("\"soundLocalAlarm\":true") >= 0;
 
   if (isLoraBoard) {
-    sendToLora = body.indexOf("\"sendToLora\":true") >= 0;
+    cfg.sendToLora = body.indexOf("\"sendToLora\":true") >= 0;
   }
 
   // String settings
@@ -938,7 +921,12 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start) {
       String val = body.substring(start, end);
-      strncpy(mqttHost, val.c_str(), MQTT_HOST_LEN);
+      if (val.length() < MQTT_HOST_LEN) {
+        strncpy(cfg.mqttHost, val.c_str(), MQTT_HOST_LEN);
+        cfg.mqttHost[MQTT_HOST_LEN - 1] = '\0';
+      } else {
+        log(WARNING, "mqttHost too long, ignoring");
+      }
     }
   }
 
@@ -948,7 +936,12 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start) {
       String val = body.substring(start, end);
-      strncpy(mqttUsername, val.c_str(), MQTT_USER_LEN);
+      if (val.length() < MQTT_USER_LEN) {
+        strncpy(cfg.mqttUsername, val.c_str(), MQTT_USER_LEN);
+        cfg.mqttUsername[MQTT_USER_LEN - 1] = '\0';
+      } else {
+        log(WARNING, "mqttUsername too long, ignoring");
+      }
     }
   }
 
@@ -958,8 +951,11 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start && end > start + 1) {
       String val = body.substring(start, end);
-      if (val.length() > 0) {
-        strncpy(mqttPassword, val.c_str(), MQTT_PASS_LEN);
+      if (val.length() > 0 && val.length() < MQTT_PASS_LEN) {
+        strncpy(cfg.mqttPassword, val.c_str(), MQTT_PASS_LEN);
+        cfg.mqttPassword[MQTT_PASS_LEN - 1] = '\0';
+      } else if (val.length() >= MQTT_PASS_LEN) {
+        log(WARNING, "mqttPassword too long, ignoring");
       }
     }
   }
@@ -970,7 +966,12 @@ void handlePostConfig(void) {
     int end = body.indexOf("\"", start);
     if (end > start) {
       String val = body.substring(start, end);
-      strncpy(mqttBaseTopic, val.c_str(), MQTT_BASE_TOPIC_LEN);
+      if (val.length() < MQTT_TOPIC_LEN) {
+        strncpy(cfg.mqttBaseTopic, val.c_str(), MQTT_TOPIC_LEN);
+        cfg.mqttBaseTopic[MQTT_TOPIC_LEN - 1] = '\0';
+      } else {
+        log(WARNING, "mqttBaseTopic too long, ignoring");
+      }
     }
   }
 
@@ -981,7 +982,12 @@ void handlePostConfig(void) {
     int end = body.indexOf(",", start);
     if (end < 0) end = body.indexOf("}", start);
     if (end > start) {
-      mqttPort = body.substring(start, end).toInt();
+      uint16_t port = body.substring(start, end).toInt();
+      if (validatePort(port)) {
+        cfg.mqttPort = port;
+      } else {
+        log(WARNING, "Invalid mqttPort: %d, ignoring", port);
+      }
     }
   }
 
@@ -991,7 +997,12 @@ void handlePostConfig(void) {
     int end = body.indexOf(",", start);
     if (end < 0) end = body.indexOf("}", start);
     if (end > start) {
-      localAlarmThreshold = body.substring(start, end).toFloat();
+      float threshold = body.substring(start, end).toFloat();
+      if (validateFloat(threshold, 0.0, 1000.0)) {  // 0-1000 µSv/h is reasonable
+        cfg.localAlarmThreshold = threshold;
+      } else {
+        log(WARNING, "Invalid localAlarmThreshold: %.2f, ignoring", threshold);
+      }
     }
   }
 
@@ -1001,7 +1012,12 @@ void handlePostConfig(void) {
     int end = body.indexOf(",", start);
     if (end < 0) end = body.indexOf("}", start);
     if (end > start) {
-      localAlarmFactor = body.substring(start, end).toInt();
+      int factor = body.substring(start, end).toInt();
+      if (validateInt(factor, 2, 100)) {  // 2-100 as per config
+        cfg.localAlarmFactor = factor;
+      } else {
+        log(WARNING, "Invalid localAlarmFactor: %d, ignoring", factor);
+      }
     }
   }
 
@@ -1013,8 +1029,12 @@ void handlePostConfig(void) {
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(devaddr, val.c_str(), IOTWEBCONF_WORD_LEN);
-        devaddr[IOTWEBCONF_WORD_LEN - 1] = '\0';
+        if (validateHexString(val, 8)) {  // DevAddr is 8 hex chars
+          strncpy(cfg.devaddr, val.c_str(), LORA_KEY_LEN);
+          cfg.devaddr[LORA_KEY_LEN - 1] = '\0';
+        } else {
+          log(WARNING, "Invalid devaddr (must be 8 hex chars), ignoring");
+        }
       }
     }
 
@@ -1024,8 +1044,12 @@ void handlePostConfig(void) {
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(nwkskey, val.c_str(), IOTWEBCONF_WORD_LEN);
-        nwkskey[IOTWEBCONF_WORD_LEN - 1] = '\0';
+        if (validateHexString(val, 32)) {  // NwkSKey is 32 hex chars
+          strncpy(cfg.nwkskey, val.c_str(), LORA_KEY_LEN);
+          cfg.nwkskey[LORA_KEY_LEN - 1] = '\0';
+        } else {
+          log(WARNING, "Invalid nwkskey (must be 32 hex chars), ignoring");
+        }
       }
     }
 
@@ -1035,32 +1059,18 @@ void handlePostConfig(void) {
       int end = body.indexOf("\"", start);
       if (end > start) {
         String val = body.substring(start, end);
-        strncpy(appskey, val.c_str(), IOTWEBCONF_WORD_LEN);
-        appskey[IOTWEBCONF_WORD_LEN - 1] = '\0';
+        if (validateHexString(val, 32)) {  // AppSKey is 32 hex chars
+          strncpy(cfg.appskey, val.c_str(), LORA_KEY_LEN);
+          cfg.appskey[LORA_KEY_LEN - 1] = '\0';
+        } else {
+          log(WARNING, "Invalid appskey (must be 32 hex chars), ignoring");
+        }
       }
     }
   }
 
-  // Update checkbox parameter valueBuffers directly
-  // IotWebConf uses these to persist values
-  strncpy(playSound_c, playSound ? "selected" : "", CHECKBOX_LEN);
-  strncpy(speakerTick_c, speakerTick ? "selected" : "", CHECKBOX_LEN);
-  strncpy(ledTick_c, ledTick ? "selected" : "", CHECKBOX_LEN);
-  strncpy(showDisplay_c, showDisplay ? "selected" : "", CHECKBOX_LEN);
-  strncpy(sendToCommunity_c, sendToCommunity ? "selected" : "", CHECKBOX_LEN);
-  strncpy(sendToMadavi_c, sendToMadavi ? "selected" : "", CHECKBOX_LEN);
-  strncpy(sendToBle_c, sendToBle ? "selected" : "", CHECKBOX_LEN);
-  strncpy(sendToMqtt_c, sendToMqtt ? "selected" : "", CHECKBOX_LEN);
-  strncpy(mqttUseTls_c, mqttUseTls ? "selected" : "", CHECKBOX_LEN);
-  strncpy(mqttRetain_c, mqttRetain ? "selected" : "", CHECKBOX_LEN);
-  strncpy(soundLocalAlarm_c, soundLocalAlarm ? "selected" : "", CHECKBOX_LEN);
-
-  if (isLoraBoard) {
-    strncpy(sendToLora_c, sendToLora ? "selected" : "", CHECKBOX_LEN);
-  }
-
   // Save configuration
-  iotWebConf.saveConfig();
+  configService.save();
   configSaved();
 
   // Send success response
@@ -1075,83 +1085,69 @@ void handlePostConfig(void) {
 
 void setup_webconf(bool loraHardware) {
   isLoraBoard = loraHardware;
-  iotWebConf.setConfigSavedCallback(&configSaved);
-  // *INDENT-OFF*   <- for 'astyle' to not format the following 3 lines
-  iotWebConf.setupUpdateServer(
-    [](const char *updatePath) { httpUpdater.setup(&server, updatePath); },
-    [](const char *userName, char *password) { httpUpdater.updateCredentials(userName, password); });
-  // *INDENT-ON*
-  // override the confusing default labels of IotWebConf:
-  iotWebConf.getThingNameParameter()->label = "Geiger accesspoint SSID";
-  iotWebConf.getApPasswordParameter()->label = "Geiger accesspoint password";
-  iotWebConf.getWifiSsidParameter()->label = "WiFi client SSID";
-  iotWebConf.getWifiPasswordParameter()->label = "WiFi client password";
 
-  // add the setting parameter
-  grpMisc.addItem(&startSoundParam);
-  grpMisc.addItem(&speakerTickParam);
-  grpMisc.addItem(&ledTickParam);
-  grpMisc.addItem(&showDisplayParam);
-  iotWebConf.addParameterGroup(&grpMisc);
-  grpTransmission.addItem(&sendToCommunityParam);
-  grpTransmission.addItem(&sendToMadaviParam);
-  grpTransmission.addItem(&sendToBleParam);
-  iotWebConf.addParameterGroup(&grpTransmission);
-  grpMqtt.addItem(&sendToMqttParam);
-  grpMqtt.addItem(&mqttHostParam);
-  grpMqtt.addItem(&mqttPortParam);
-  grpMqtt.addItem(&mqttUseTlsParam);
-  grpMqtt.addItem(&mqttRetainParam);
-  grpMqtt.addItem(&mqttUserParam);
-  grpMqtt.addItem(&mqttPassParam);
-  grpMqtt.addItem(&mqttBaseTopicParam);
-  iotWebConf.addParameterGroup(&grpMqtt);
-  if (isLoraBoard) {
-    grpLoRa.addItem(&sendToLoraParam);
-    grpLoRa.addItem(&devaddrParam);
-    grpLoRa.addItem(&nwkskeyParam);
-    grpLoRa.addItem(&appskeyParam);
-    iotWebConf.addParameterGroup(&grpLoRa);
+  // Initialize ConfigService
+  if (!configService.begin()) {
+    log(ERROR, "Failed to initialize ConfigService");
   }
-  grpAlarm.addItem(&soundLocalAlarmParam);
-  grpAlarm.addItem(&localAlarmThresholdParam);
-  grpAlarm.addItem(&localAlarmFactorParam);
-  iotWebConf.addParameterGroup(&grpAlarm);
-  grpAuth.addItem(&httpAuthUserParam);
-  grpAuth.addItem(&httpAuthPassParam);
-  iotWebConf.addParameterGroup(&grpAuth);
+
+  Config& cfg = configService.getConfig();
 
   // if we don't have LoRa hardware, do not send to LoRa
-  if (!isLoraBoard)
-    sendToLora = false;
+  if (!isLoraBoard) {
+    cfg.sendToLora = false;
+  }
 
-  iotWebConf.init();
+  // Build SSID from device name
+  buildSSID();
+
+  // Initialize WiFi Service
+  wifiService.begin(cfg.deviceName, cfg.apPassword);
+  wifiService.setApTimeout(30000);         // AP timeout: 30 seconds if no client connects
+  wifiService.setConnectionTimeout(20000);  // STA connect timeout: 20 seconds
+
+  // If WiFi credentials are configured, try to connect
+  if (configService.hasWifiConfig()) {
+    wifiService.connectToWiFi(cfg.wifiSsid, cfg.wifiPassword);
+  }
+
   loadConfigVariables();
 
-  // Set HTTP updater credentials to match our HTTP auth
-  httpUpdater.updateCredentials(httpAuthUser, httpAuthPass);
+  // Setup ArduinoOTA callbacks (will begin() later when WiFi is ready)
+  ArduinoOTA.setHostname(cfg.deviceName);
+  ArduinoOTA.setPassword(cfg.httpAuthPass);  // Use same password as HTTP auth
 
-  // Ensure AP password is set; otherwise library forces permanent AP mode.
-  if (iotWebConf.getApPasswordParameter()->valueBuffer[0] == '\0') {
-    strncpy(iotWebConf.getApPasswordParameter()->valueBuffer, wifiInitialApPassword, IOTWEBCONF_PASSWORD_LEN);
-    iotWebConf.getApPasswordParameter()->valueBuffer[IOTWEBCONF_PASSWORD_LEN - 1] = '\0';
-    iotWebConf.saveConfig();
-  }
+  ArduinoOTA.onStart([]() {
+    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+    log(INFO, "ArduinoOTA: Start updating %s", type.c_str());
+    tick_enable(false);  // Disable ticks during OTA
+  });
 
-  // Always start AP for 30 seconds on boot (gives user time to configure WiFi)
-  iotWebConf.setApTimeoutMs(30000);              // AP timeout: 30 seconds if no client connects
-  iotWebConf.setWifiConnectionTimeoutMs(20000);  // STA connect timeout: 20 seconds
+  ArduinoOTA.onEnd([]() {
+    log(INFO, "ArduinoOTA: Update complete");
+    tick_enable(true);
+  });
 
-  if (hasConfiguredWifi()) {
-    iotWebConf.forceApMode(false);  // allow leaving AP mode to connect to STA
-  }
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    static unsigned int lastPercent = 0;
+    unsigned int percent = (progress / (total / 100));
+    if (percent != lastPercent && percent % 10 == 0) {
+      log(INFO, "ArduinoOTA: Progress: %u%%", percent);
+      lastPercent = percent;
+    }
+  });
 
-  wifiEventId = WiFi.onEvent(onWifiEvent);
-  apConnectEventId = WiFi.onEvent(onApClientConnectEvent, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
-  apDisconnectEventId = WiFi.onEvent(onApClientDisconnectEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
-  (void)wifiEventId;  // suppress unused warning for now
-  (void)apConnectEventId;
-  (void)apDisconnectEventId;
+  ArduinoOTA.onError([](ota_error_t error) {
+    log(ERROR, "ArduinoOTA: Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) log(ERROR, "Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) log(ERROR, "Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) log(ERROR, "Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) log(ERROR, "Receive Failed");
+    else if (error == OTA_END_ERROR) log(ERROR, "End Failed");
+    tick_enable(true);  // Re-enable ticks after error
+  });
+
+  // Note: ArduinoOTA.begin() will be called in poll_transmission() once WiFi is connected
 
   auto redirectToCaptivePortal = []() {
     log(INFO, "Captive portal probe detected, redirecting to dashboard");
@@ -1193,16 +1189,51 @@ void setup_webconf(bool loraHardware) {
   server.on("/hotspot-detect.html", HTTP_ANY, redirectToCaptivePortal);  // Apple
   server.on("/ncsi.txt", HTTP_ANY, redirectToCaptivePortal);          // Windows
   server.on("/config", handleConfigPage);
-  server.on("/firmware", [] {
+
+  // OTA Update endpoint - explicitly register handlers for HTTPUpdateServer
+  server.on("/update", HTTP_GET, []() {
     if (!checkHttpAuth()) return;
-    iotWebConf.handleConfig();
-  });  // OTA firmware update (protected)
-  server.onNotFound([]() {
-    // Quietly redirect captive-portal probes (e.g. connectivitycheck.gstatic.com) to root
-    if (iotWebConf.handleCaptivePortal()) {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", "<form method='POST' action='/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>");
+  });
+  server.on("/update", HTTP_POST, []() {
+    if (!checkHttpAuth()) {
       return;
     }
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart();
+  }, []() {
+    // Upload handler
+    if (!checkHttpAuth()) {
+      return;
+    }
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      log(INFO, "Update: %s", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) {
+        log(INFO, "Update Success: %u bytes", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+    }
+  });
+
+  server.onNotFound([]() {
+    // Redirect all unknown requests to root (captive portal behavior)
     server.sendHeader("Location", "/");
     server.send(302, "text/plain", "");
   });
+
+  // Start web server
+  server.begin();
+  log(INFO, "Web server started");
 }

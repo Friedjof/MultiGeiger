@@ -334,7 +334,109 @@ class ConfigManager {
     }
 }
 
-// Initialize config manager when DOM is ready
+// Firmware Upload Handler
+class FirmwareUploader {
+    constructor() {
+        this.form = document.getElementById('upload-form');
+        this.uploadBtn = document.getElementById('upload-btn');
+        this.progressContainer = document.getElementById('upload-progress');
+        this.progressFill = document.getElementById('progress-fill');
+        this.progressText = document.getElementById('progress-text');
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.form.addEventListener('submit', (e) => this.handleUpload(e));
+    }
+
+    async handleUpload(e) {
+        e.preventDefault();
+
+        const fileInput = document.getElementById('firmware-file');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert('Please select a firmware file');
+            return;
+        }
+
+        if (!file.name.endsWith('.bin')) {
+            alert('Please select a .bin file');
+            return;
+        }
+
+        // Show progress
+        this.progressContainer.classList.remove('hidden');
+        this.uploadBtn.disabled = true;
+        this.uploadBtn.innerHTML = '<span class="btn-icon">⏳</span><span>Uploading...</span>';
+
+        const formData = new FormData();
+        formData.append('update', file);
+
+        try {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    this.updateProgress(percent);
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    this.updateProgress(100);
+                    alert('Firmware uploaded successfully! Device will restart...');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 3000);
+                } else {
+                    throw new Error('Upload failed: ' + xhr.statusText);
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                throw new Error('Upload failed. Please try again.');
+            });
+
+            xhr.open('POST', '/update');
+            xhr.send(formData);
+
+        } catch (error) {
+            alert('Upload failed: ' + error.message);
+            this.resetUploadForm();
+        }
+    }
+
+    updateProgress(percent) {
+        this.progressFill.style.width = percent + '%';
+        this.progressText.textContent = percent + '%';
+    }
+
+    resetUploadForm() {
+        this.progressContainer.classList.add('hidden');
+        this.progressFill.style.width = '0%';
+        this.progressText.textContent = '0%';
+        this.uploadBtn.disabled = false;
+        this.uploadBtn.innerHTML = '<span class="btn-icon">⬆️</span><span>Upload Firmware</span>';
+    }
+}
+
+// Initialize version display
+function initVersion() {
+    // __APP_VERSION__ will be replaced by build script
+    const version = __APP_VERSION__;
+    const versionElement = document.getElementById('app-version');
+    if (versionElement) {
+        versionElement.textContent = version;
+        versionElement.href = `https://github.com/Stride-Labs/MultiGeiger/releases/tag/${version}`;
+    }
+}
+
+// Initialize config manager and firmware uploader when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    initVersion();
     new ConfigManager();
+    new FirmwareUploader();
 });

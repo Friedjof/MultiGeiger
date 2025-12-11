@@ -7,7 +7,7 @@ SPHINXBUILD ?= $(CURDIR)/$(VENV)/bin/sphinx-build
 DOCS_STAMP ?= $(VENV)/.docs-installed
 WEB_ASSETS ?= src/comm/wifi/web_assets.h
 
-.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web
+.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web release
 
 all: build
 
@@ -55,3 +55,18 @@ $(DOCS_STAMP): docs/requirements.txt $(VENV)/bin/python
 	@command -v $(UV) >/dev/null || { echo "uv not found: install from https://github.com/astral-sh/uv#installation" >&2; exit 1; }
 	@$(UV) pip install --python $(VENV)/bin/python -r docs/requirements.txt
 	@touch $(DOCS_STAMP)
+
+release:
+ifndef VERSION
+	@echo "Error: VERSION is required. Usage: make release VERSION=vX.Y.Z"
+	@exit 1
+endif
+	@echo "Creating release $(VERSION)..."
+	@echo "// $(VERSION)" > VERSION
+	@echo "Version file updated to $(VERSION)"
+	@$(MAKE) build-web
+	@git add VERSION $(WEB_ASSETS)
+	@git commit -m "Release $(VERSION)"
+	@git tag $(VERSION)
+	@echo "Release $(VERSION) created successfully!"
+	@echo "To push: git push && git push --tags"

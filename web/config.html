@@ -269,10 +269,23 @@
             <div class="section-content">
             <div class="update-info">
                 <p>Current Version: <strong id="current-version">Loading...</strong></p>
-                <a href="/firmware" class="btn btn-secondary">
-                    <span class="btn-icon">📦</span>
-                    <span>Update Firmware</span>
-                </a>
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="firmware-file">Select Firmware (.bin file)</label>
+                        <input type="file" id="firmware-file" name="update" accept=".bin" required>
+                        <span class="help-text">Choose a firmware.bin file to upload</span>
+                    </div>
+                    <div id="upload-progress" class="progress-container hidden">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <p id="progress-text" class="progress-text">0%</p>
+                    </div>
+                    <button type="submit" id="upload-btn" class="btn btn-secondary">
+                        <span class="btn-icon">⬆️</span>
+                        <span>Upload Firmware</span>
+                    </button>
+                </form>
             </div>
             </div>
         </div>
@@ -281,6 +294,9 @@
         <div class="footer-info">
             <p>MultiGeiger Configuration</p>
             <p class="small-text">Device will restart after saving</p>
+            <p class="small-text">
+                Version: <a id="app-version" href="#" target="_blank" rel="noopener">--</a>
+            </p>
         </div>
     </div>
 

@@ -22,10 +22,21 @@ class Dashboard {
 
     init() {
         console.log('MultiGeiger Dashboard initialized');
+        this.initVersion();
         this.startAutoUpdate();
 
         // Initial fetch
         this.fetchData();
+    }
+
+    initVersion() {
+        // __APP_VERSION__ will be replaced by build script
+        const version = __APP_VERSION__;
+        const versionElement = document.getElementById('app-version');
+        if (versionElement) {
+            versionElement.textContent = version;
+            versionElement.href = `https://github.com/Stride-Labs/MultiGeiger/releases/tag/${version}`;
+        }
     }
 
     startAutoUpdate() {
