@@ -88,7 +88,7 @@ export class MultiGeigerApp {
 
   applyVersion() {
     const version = __APP_VERSION__ || 'dev';
-    const url = `https://github.com/Stride-Labs/MultiGeiger/releases/tag/${version}`;
+    const url = `https://github.com/Friedjof/MultiGeiger/releases/tag/${version}`;
     const footerLink = qs('uiVersionFooter');
     if (footerLink) {
       footerLink.textContent = version;

@@ -35,7 +35,7 @@ class Dashboard {
         const versionElement = document.getElementById('app-version');
         if (versionElement) {
             versionElement.textContent = version;
-            versionElement.href = `https://github.com/Stride-Labs/MultiGeiger/releases/tag/${version}`;
+            versionElement.href = `https://github.com/Friedjof/MultiGeiger/releases/tag/${version}`;
         }
     }
 
