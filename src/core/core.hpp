@@ -67,5 +67,5 @@ void reverseByteArray(unsigned char *data, int len);
 // major = 0..15, minor = 0..255, patch = 0..15.
 //
 // vvv--- do not edit here, this is managed by bump2version! ---vvv
-#define VERSION_STR "v1.18.0-dev"
+#define VERSION_STR "v1.20.1-dev"
 // ^^^--- do not edit here, this is managed by bump2version! ---^^^

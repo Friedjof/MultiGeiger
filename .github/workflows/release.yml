@@ -58,9 +58,13 @@ jobs:
 
       - name: Package binaries
         run: |
+          # Extract version from tag (e.g. refs/tags/v1.20.0 -> v1.20.0)
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "📦 Packaging firmware for version: $VERSION"
           mkdir -p binaries/geiger
-          cp .pio/build/geiger/firmware.bin binaries/geiger/ || true
-          cp .pio/build/geiger/firmware.elf binaries/geiger/ || true
+          cp .pio/build/geiger/firmware.bin binaries/geiger/multigeiger-${VERSION}.bin || true
+          cp .pio/build/geiger/firmware.elf binaries/geiger/multigeiger-${VERSION}.elf || true
+          echo "✅ Packaged files:"
           ls -lh binaries/geiger
 
       - name: Publish release assets
