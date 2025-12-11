@@ -295,7 +295,6 @@ MultiGeiger/
 │   └── main.cpp             # Entry point
 ├── web/                     # Web interface (Single-Page Application)
 │   ├── index.html           # SPA entry point (Dashboard + Status + Settings)
-│   ├── config.html          # Configuration page (legacy, redirects to index.html)
 │   ├── src/                 # JavaScript/CSS sources
 │   │   ├── main.js          # Entry point & initialization
 │   │   ├── app.js           # Main application class (MultiGeigerApp)
@@ -309,7 +308,6 @@ MultiGeiger/
 │   ├── images/              # Screenshots
 │   └── assembly/            # Assembly PDFs
 ├── tools/                   # Build & data tools
-│   ├── embed_web.py         # (legacy) älteres Embed-Skript
 │   ├── ttn_fetcher/         # TTN data downloader
 │   │   ├── fetch_ttn_data.py    # CLI tool
 │   │   ├── ttn_daemon.py        # Background daemon
