@@ -73,6 +73,17 @@ Project layout
 - ``src/comm``: WiFi config portal, LoRa/TTN glue, BLE Heart-Rate notifications, MQTT publishing.
 - ``docs``: Sphinx sources (English master, translations via Transifex).
 
+Make targets
+------------
+
+Handy targets from the top-level ``Makefile``:
+
+- ``make setup``: copy default config to ``src/config/config.hpp`` (if missing) and provision the docs virtualenv with ``uv``.
+- ``make build``: build the web UI, inject the version from ``VERSION`` into ``src/core/core.hpp`` and run the default PlatformIO build.
+- ``make flash`` / ``make monitor``: upload firmware via USB and open the serial console.
+- ``make docs`` / ``make docs-clean``: build or clean the Sphinx docs using the ``.venv`` created by ``make setup``.
+- ``make release v=1.23.0``: update version files, build web assets, create commit + tag and push to ``origin`` (see details below).
+
 Automatic Code Formatter
 ------------------------
 
@@ -177,19 +188,23 @@ Checklist:
 - find and fix any low hanging fruit left on the issue tracker
 - close release milestone on Github
 - update ``docs/source/changes.rst``, based on ``git log $PREVIOUS_RELEASE..``
-- ``bump2version --new-version 1.23.0 release`` - this will:
 
-  - update versions everywhere
-  - auto-create a git tag
-  - auto-create a git commit
-- review the automatically generated changeset
-- create a github release for this tag:
+Release helper (preferred):
 
-  - create a binary (see above) and attach to the github release
-  - add a link to the relevant ``changes.rst`` section to the github release
+``make release v=1.23.0``
 
-- ``bump2version --no-tag --current-version 1.23.0 minor`` - this will:
+This will:
 
-  - update versions everywhere (now to: 1.24.0-dev)
-  - not quite correctly update changes.rst, will need manual fixing afterwards
-  - after fixing: git commit --amend
+- write ``// v1.23.0`` into ``VERSION`` and inject the same value into ``src/core/core.hpp``.
+- rebuild the web assets (``make build-web``).
+- create a release commit (staging both version files), tag ``v1.23.0`` and push ``HEAD`` plus the tag to ``origin``.
+
+Requirements:
+
+- clean git working tree (changes should be committed or stashed before running).
+- ``origin`` remote configured and push access available.
+
+After the push:
+
+- upload the generated firmware binaries (see "Flashing devices / creating binaries").
+- create/update the GitHub release page and link to the relevant ``changes.rst`` section.

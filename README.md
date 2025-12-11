@@ -242,44 +242,17 @@ Legacy HTTP uploads (sensor.community/madavi/custom) have been removed. Use MQTT
 
 The project uses a **Makefile** for common tasks:
 
-**Build & Flash:**
-
 ```bash
-make build          # Build web assets + compile firmware
-make web            # Build web UI (Vite) + generate header
-make flash          # Upload firmware to device
-make monitor        # Open serial monitor (115200 baud)
-make clean          # Clean build artifacts
+make setup     # prepare config + docs venv
+make build     # build web assets + compile firmware
+make flash     # upload firmware
+make monitor   # serial console
+make docs      # build Sphinx docs
+make clean     # clean build artifacts
+make release v=1.23.0  # tag + push release (injects VERSION/core.hpp)
 ```
 
-**Development:**
-
-```bash
-make format         # Format code (clang-format, prettier)
-make lint           # Run linters (cpplint, eslint)
-make test           # Run unit tests
-```
-
-**Documentation:**
-
-```bash
-make docs           # Build Sphinx documentation
-make docs-serve     # Serve docs locally (http://localhost:8000)
-make docs-clean     # Clean documentation build
-```
-
-**Release:**
-
-```bash
-make release        # Build release firmware (optimized)
-```
-
-The Makefile automates:
-
-- 🌐 **Web asset bundling**: Vite build + gzip + Header-Export für das ESP32-Frontend
-- 📦 **Dependency management**: Installs PlatformIO libraries
-- 🔨 **Multi-environment builds**: ESP32, ESP32-S2, ESP32-C3 variants
-- 🚀 **CI/CD integration**: Same commands used in GitHub Actions
+More details and additional targets: see `docs/source/development.rst`.
 
 ### Project Structure 📁
 
