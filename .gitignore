@@ -21,7 +21,6 @@ src/config/config.hpp
 *.map
 
 # Generated web assets
-src/comm/wifi/web_assets.h
 lib/WebService/generated/web_files.h
 web/dist/
 

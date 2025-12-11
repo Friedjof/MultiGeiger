@@ -5,7 +5,6 @@ VENV ?= .venv
 PYTHON ?= python3
 SPHINXBUILD ?= $(CURDIR)/$(VENV)/bin/sphinx-build
 DOCS_STAMP ?= $(VENV)/.docs-installed
-WEB_ASSETS ?= lib/WebService/generated/web_files.h
 
 .PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web release
 
@@ -63,15 +62,39 @@ $(DOCS_STAMP): docs/requirements.txt $(VENV)/bin/python
 
 release:
 ifndef v
-	@echo "Error: version required. Usage: make release v=X.Y.Z"
+	@echo "Error: version required. Usage: make release v=X.Y.Z or v=vX.Y.Z"
 	@exit 1
 endif
-	@echo "Creating release v$(v)..."
-	@echo "// v$(v)" > VERSION
-	@echo "Version file updated to v$(v)"
+	$(eval VERSION_CLEAN := $(shell echo "$(v)" | sed 's/^v//'))
+	@echo "Creating release v$(VERSION_CLEAN)..."
+	@echo "// v$(VERSION_CLEAN)" > VERSION
+	@echo "Version file updated to v$(VERSION_CLEAN)"
 	@$(MAKE) build-web
-	@git add VERSION $(WEB_ASSETS)
-	@git commit -m "Release v$(v)"
-	@git tag v$(v)
-	@echo "Release v$(v) created successfully!"
-	@echo "To push: git push && git push --tags"
+	@echo "Preparing release commit with recent changes..."
+	@echo "Release v$(VERSION_CLEAN)" > /tmp/release_msg.txt
+	@echo "" >> /tmp/release_msg.txt
+	@last_tag=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	if [ -n "$$last_tag" ]; then \
+		commit_count=$$(git rev-list $$last_tag..HEAD --count); \
+		if [ $$commit_count -eq 0 ]; then \
+			echo "No changes since last release ($$last_tag)" >> /tmp/release_msg.txt; \
+		else \
+			echo "Changes since $$last_tag:" >> /tmp/release_msg.txt; \
+			git log $$last_tag..HEAD --format="- %s" -20 >> /tmp/release_msg.txt; \
+		fi; \
+	else \
+		echo "Recent changes:" >> /tmp/release_msg.txt; \
+		git log -5 --format="- %s" >> /tmp/release_msg.txt; \
+	fi
+	@git add VERSION
+	@git commit -F /tmp/release_msg.txt
+	@rm /tmp/release_msg.txt
+	@git tag v$(VERSION_CLEAN)
+	@echo ""
+	@echo "✅ Release v$(VERSION_CLEAN) created successfully!"
+	@echo "📦 Pushing to origin..."
+	@git push origin HEAD
+	@git push origin v$(VERSION_CLEAN)
+	@echo ""
+	@echo "🎉 Release v$(VERSION_CLEAN) published!"
+	@echo "View at: $$(git remote get-url origin | sed 's/\.git$$//')/releases/tag/v$(VERSION_CLEAN)"
