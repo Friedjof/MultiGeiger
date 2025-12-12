@@ -6,7 +6,7 @@ PYTHON ?= python3
 SPHINXBUILD ?= $(CURDIR)/$(VENV)/bin/sphinx-build
 DOCS_STAMP ?= $(VENV)/.docs-installed
 
-.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web release
+.PHONY: build flash monitor run clean setup docs docs-clean docs-env erase web build-web release info
 
 all: build
 
@@ -17,6 +17,9 @@ build-web:
 	@$(PYTHON) scripts/web_to_header.py web/dist -o lib/WebService/generated/web_files.h
 
 web: build-web
+
+info:
+	@$(PYTHON) tools/info.py
 
 build: build-web
 	@echo "Injecting version from VERSION file..."
