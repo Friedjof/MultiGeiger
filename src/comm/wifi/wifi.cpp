@@ -1431,9 +1431,11 @@ void setup_webconf(bool loraHardware) {
   wifiService.setApTimeout(30000);         // AP timeout: 30 seconds if no client connects
   wifiService.setConnectionTimeout(20000);  // STA connect timeout: 20 seconds
 
-  // If WiFi credentials are configured, try to connect
+  // If WiFi credentials are configured, store them but don't connect yet
+  // AP will stay active for 30 seconds before attempting to connect
   if (configService.hasWifiConfig()) {
-    wifiService.connectToWiFi(cfg.wifiSsid, cfg.wifiPassword);
+    log(INFO, "WiFi credentials found - will connect after AP timeout (30s)");
+    wifiService.setWiFiCredentials(cfg.wifiSsid, cfg.wifiPassword);
   }
 
   loadConfigVariables();

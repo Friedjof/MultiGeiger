@@ -58,6 +58,20 @@ void WiFiService::loop() {
     updateState();
 }
 
+void WiFiService::setWiFiCredentials(const char* ssid, const char* password) {
+    if (ssid == nullptr) {
+        return;
+    }
+
+    log(INFO, "WiFi credentials stored: %s", ssid);
+
+    // Store credentials
+    strncpy(lastSsid, ssid, sizeof(lastSsid) - 1);
+    lastSsid[sizeof(lastSsid) - 1] = '\0';
+    strncpy(lastPassword, password ? password : "", sizeof(lastPassword) - 1);
+    lastPassword[sizeof(lastPassword) - 1] = '\0';
+}
+
 bool WiFiService::connectToWiFi(const char* ssid, const char* password) {
     if (ssid == nullptr || ssid[0] == '\0') {
         log(WARNING, "Cannot connect: SSID is empty");
@@ -156,31 +170,27 @@ void WiFiService::updateState() {
 }
 
 void WiFiService::handleApMode() {
-    // Check if we have WiFi credentials and should try to connect
-    if (!apModeForced && lastSsid[0] != '\0') {
-        // Check AP timeout only if no client is connected
-        if (!apClientConnected && apTimeoutMs > 0) {
-            if (millis() - apStartTime > apTimeoutMs) {
-                log(INFO, "AP timeout - switching to STA mode");
-                connectToWiFi(lastSsid, lastPassword);
-                return;
-            }
-        }
-    }
-
     // Check if client connected/disconnected
     bool nowConnected = (WiFi.softAPgetStationNum() > 0);
     if (nowConnected != apClientConnected) {
         apClientConnected = nowConnected;
         if (nowConnected) {
             log(INFO, "Client connected to AP");
-            // Disable timeout when client connects
-            apTimeoutMs = 0;
         } else {
             log(INFO, "Client disconnected from AP");
-            // If we have WiFi config, switch to STA mode
-            if (!apModeForced && lastSsid[0] != '\0') {
+        }
+    }
+
+    // Check if we have WiFi credentials and should try to connect
+    if (!apModeForced && lastSsid[0] != '\0') {
+        // Check AP timeout only if:
+        // 1. No client is connected AND
+        // 2. Minimum AP time (apTimeoutMs) has elapsed
+        if (!apClientConnected && apTimeoutMs > 0) {
+            if (millis() - apStartTime > apTimeoutMs) {
+                log(INFO, "AP timeout (%lums) reached - switching to STA mode", apTimeoutMs);
                 connectToWiFi(lastSsid, lastPassword);
+                return;
             }
         }
     }

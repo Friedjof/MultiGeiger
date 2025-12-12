@@ -50,6 +50,13 @@ public:
     bool connectToWiFi(const char* ssid, const char* password);
 
     /**
+     * @brief Store WiFi credentials without connecting immediately
+     * @param ssid WiFi SSID
+     * @param password WiFi password
+     */
+    void setWiFiCredentials(const char* ssid, const char* password);
+
+    /**
      * @brief Start Access Point mode
      * @return true if AP started successfully
      */
