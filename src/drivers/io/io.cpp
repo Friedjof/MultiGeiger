@@ -183,6 +183,9 @@ void tick_enable(bool enable) {
   } else {
     led_tick = false;
     speaker_tick = false;
+    // Ensure outputs are quiet when disabled
+    speakerOff();
+    digitalWrite(LED_BUILTIN, LOW);
   }
 }
 
@@ -227,6 +230,8 @@ void setup_speaker(bool _led_tick, bool _speaker_tick) {
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
 
   tick_enable(false);  // no ticking while we init audio
+  speakerOff();
+  digitalWrite(LED_BUILTIN, LOW);
 
   if (!audio_command_queue) {
     audio_command_queue = xQueueCreate(8, sizeof(AudioCommand));
